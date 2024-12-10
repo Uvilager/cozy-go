@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"auth-service/internal/models"
+	"auth-service/internal/utils"
 	"auth-service/repository"
 
 	"github.com/go-playground/validator/v10"
@@ -62,10 +63,13 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-}
+	// Generate JWT token
+	token, err := utils.GenerateJWT(user)
+	if err != nil {
+		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
+		return
+	}
 
-func (h *AuthHandler) HealthCheck(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("OK"))
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"token": token})
 }

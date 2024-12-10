@@ -32,10 +32,11 @@ func main() {
 	// Initialize HTTP handlers
 	authHandler := handlers.NewAuthHandler(authRepo)
 	healthHandler := handlers.NewHealthHandler(healthRepo)
+	protectedHandler := handlers.NewProtectedHandler()
 
 	// Start HTTP server
 	mux := http.NewServeMux()
-	routes.RegisterRoutes(mux, authHandler, healthHandler)
+	routes.RegisterRoutes(mux, authHandler, healthHandler, protectedHandler)
 	log.Println("Starting HTTP server on port 8080")
 	err = http.ListenAndServe(":8080", mux)
 	if err != nil {
