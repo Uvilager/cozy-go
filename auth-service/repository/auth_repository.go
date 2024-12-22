@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackc/pgx"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type AuthRepository interface {
@@ -33,7 +34,9 @@ func (r *authRepository) Authenticate(user models.User) (bool, error) {
 		return false, err
 	}
 
-	if storedPassword != user.Password {
+	// Compare the hashed password
+	err = bcrypt.CompareHashAndPassword([]byte(storedPassword), []byte(user.Password))
+	if err != nil {
 		return false, errors.New("invalid password")
 	}
 

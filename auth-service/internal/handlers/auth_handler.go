@@ -33,8 +33,16 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Hash the user's password
+	hashedPassword, err := utils.HashPassword(user.Password)
+	if err != nil {
+		http.Error(w, "Failed to hash password", http.StatusInternalServerError)
+		return
+	}
+	user.Password = hashedPassword
+
 	// Save user to the database
-	_, err := h.repo.Register(user)
+	_, err = h.repo.Register(user)
 	if err != nil {
 		http.Error(w, "Failed to register user", http.StatusInternalServerError)
 		return
