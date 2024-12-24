@@ -9,6 +9,7 @@ services:
       - POSTGRES_PASSWORD=password
     depends_on:
       - db
+      - rabbitmq
 
   db:
     image: postgres:latest
@@ -37,6 +38,12 @@ services:
       PGADMIN_DEFAULT_PASSWORD: admin
     ports:
       - "5050:80"
+
+  rabbitmq:
+    image: rabbitmq:4.0-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
 
 volumes:
   db_data:

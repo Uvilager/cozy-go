@@ -10,14 +10,16 @@ import (
 	"auth-service/repository"
 
 	"github.com/go-playground/validator/v10"
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type AuthHandler struct {
-	repo repository.AuthRepository
+	repo         repository.AuthRepository
+	rabbitMQConn *amqp.Connection
 }
 
-func NewAuthHandler(repo repository.AuthRepository) *AuthHandler {
-	return &AuthHandler{repo: repo}
+func NewAuthHandler(repo repository.AuthRepository, rabbitMQConn *amqp.Connection) *AuthHandler {
+	return &AuthHandler{repo: repo, rabbitMQConn: rabbitMQConn}
 }
 
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
@@ -80,6 +82,32 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
 		return
 	}
+
+	// Emit login event to RabbitMQ
+	ch, err := h.rabbitMQConn.Channel()
+	if err != nil {
+		log.Printf("Failed to open a channel: %v", err)
+		http.Error(w, "Failed to process login event", http.StatusInternalServerError)
+		return
+	}
+	defer ch.Close()
+
+	err = ch.Publish(
+		"",             // exchange
+		"login_events", // routing key
+		false,          // mandatory
+		false,          // immediate
+		amqp.Publishing{
+			ContentType: "text/plain",
+			Body:        []byte(user.Username + " logged in"),
+		})
+	if err != nil {
+		log.Printf("Failed to publish a message: %v", err)
+		http.Error(w, "Failed to process login event", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf(" [x] Sent %s\n", user.Username+" logged in")
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"token": token})

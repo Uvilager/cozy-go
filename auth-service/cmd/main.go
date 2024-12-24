@@ -5,16 +5,42 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	// ...other imports...
+	amqp "github.com/rabbitmq/amqp091-go"
 
 	"auth-service/internal/handlers"
 	"auth-service/internal/routes"
 	"auth-service/repository"
 )
 
+func setupRabbitMQ() (*amqp.Connection, error) {
+	var conn *amqp.Connection
+	var err error
+	for i := 0; i < 5; i++ {
+		log.Print("Attempting to connect to RabbitMQ...")
+		conn, err = amqp.Dial("amqp://guest:guest@rabbitmq:5672/")
+		if err == nil {
+			break
+		}
+		log.Printf("Failed to connect to RabbitMQ (attempt %d/5): %v", i+1, err)
+		time.Sleep(3 * time.Second)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return conn, nil
+}
+
 func main() {
+	// Connect to RabbitMQ
+	conn, err := setupRabbitMQ()
+	if err != nil {
+		log.Fatalf("Failed to connect to RabbitMQ: %v", err)
+	}
+	defer conn.Close()
+
 	// Initialize database connection
 	log.Println("Attempting to connect to Postgres...")
 	connStr := "postgres://" + os.Getenv("POSTGRES_USER") + ":" + os.Getenv("POSTGRES_PASSWORD") +
@@ -30,7 +56,7 @@ func main() {
 	healthRepo := repository.NewHealthRepository(dbpool)
 
 	// Initialize HTTP handlers
-	authHandler := handlers.NewAuthHandler(authRepo)
+	authHandler := handlers.NewAuthHandler(authRepo, conn)
 	healthHandler := handlers.NewHealthHandler(healthRepo)
 	protectedHandler := handlers.NewProtectedHandler()
 
