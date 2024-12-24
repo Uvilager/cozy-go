@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 
 	"auth-service/internal/models"
@@ -44,6 +45,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	// Save user to the database
 	_, err = h.repo.Register(user)
 	if err != nil {
+		log.Printf("Failed to register user: %v", err)
 		http.Error(w, "Failed to register user", http.StatusInternalServerError)
 		return
 	}
@@ -67,6 +69,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	valid, err := h.repo.Authenticate(user)
 	if err != nil || !valid {
+		log.Printf("Failed to authenticate user: %v", err)
 		http.Error(w, "Invalid username or password", http.StatusUnauthorized)
 		return
 	}
