@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - add-tests
+      - notification-service
   pull_request:
     branches:
       - main
