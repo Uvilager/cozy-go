@@ -48,7 +48,7 @@ jobs:
       run: |
         cd auth-service
         go install github.com/pressly/goose/v3/cmd/goose@latest
-        goose -dir migrations postgres "postgres://username:password@localhost:5432/testdb?sslmode=disable" up
+        goose -dir migrations postgres "postgres://username:password@localhost:5433/testdb?sslmode=disable" up
 
     - name: Run tests
       run: |
