@@ -1,0 +1,56 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - add-tests
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:latest
+        ports:
+          - 5433:5432
+        env:
+          POSTGRES_USER: username
+          POSTGRES_DB: testdb
+          POSTGRES_PASSWORD: password
+        options: >-
+          --health-cmd "pg_isready -U username -d testdb"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.23.4
+
+    - name: Wait for PostgreSQL to be ready
+      run: |
+        echo "Waiting for PostgreSQL to be ready..."
+        until pg_isready -h localhost -p 5433 -U username -d testdb; do
+          sleep 5
+        done
+
+    - name: Run migrations
+      run: |
+        cd auth-service
+        go install github.com/pressly/goose/v3/cmd/goose@latest
+        goose -dir migrations postgres "postgres://username:password@localhost:5433/testdb?sslmode=disable" up
+
+    - name: Run tests
+      run: |
+        cd auth-service
+        go test ./internal/tests/
