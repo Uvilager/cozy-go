@@ -29,6 +29,17 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
+      rabbitmq:
+        image: rabbitmq:3-management
+        ports:
+          - 5672:5672
+          - 15672:15672
+        options: >-
+          --health-cmd "rabbitmqctl status"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v2
@@ -45,6 +56,13 @@ jobs:
           sleep 5
         done
 
+    - name: Wait for RabbitMQ to be ready
+      run: |
+        echo "Waiting for RabbitMQ to be ready..."
+        until curl -s -f -o /dev/null "http://localhost:15672"; do
+          sleep 5
+        done
+
     - name: Run migrations
       run: |
         cd auth-service
@@ -54,4 +72,4 @@ jobs:
     - name: Run tests
       run: |
         cd auth-service
-        go test ./internal/tests/
+        go test ./internal/tests/ -v
