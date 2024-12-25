@@ -11,6 +11,11 @@ services:
       - db
       - rabbitmq
 
+  notification-service:
+    build: ./notification-service
+    depends_on:
+      - rabbitmq
+      
   db:
     image: postgres:latest
     environment:
