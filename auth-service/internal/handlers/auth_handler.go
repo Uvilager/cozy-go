@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 
+	"auth-service/internal/events"
 	"auth-service/internal/models"
 	"auth-service/internal/utils"
 	"auth-service/repository"
@@ -84,30 +85,11 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Emit login event to RabbitMQ
-	ch, err := h.rabbitMQConn.Channel()
+	err = events.PublishLoginEvent(h.rabbitMQConn, user.Username)
 	if err != nil {
-		log.Printf("Failed to open a channel: %v", err)
 		http.Error(w, "Failed to process login event", http.StatusInternalServerError)
 		return
 	}
-	defer ch.Close()
-
-	err = ch.Publish(
-		"",             // exchange
-		"login_events", // routing key
-		false,          // mandatory
-		false,          // immediate
-		amqp.Publishing{
-			ContentType: "text/plain",
-			Body:        []byte(user.Username + " logged in"),
-		})
-	if err != nil {
-		log.Printf("Failed to publish a message: %v", err)
-		http.Error(w, "Failed to process login event", http.StatusInternalServerError)
-		return
-	}
-
-	log.Printf(" [x] Sent %s\n", user.Username+" logged in")
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"token": token})
