@@ -9,7 +9,13 @@ services:
       - POSTGRES_PASSWORD=password
     depends_on:
       - db
+      - rabbitmq
 
+  notification-service:
+    build: ./notification-service
+    depends_on:
+      - rabbitmq
+      
   db:
     image: postgres:latest
     environment:
@@ -37,6 +43,18 @@ services:
       PGADMIN_DEFAULT_PASSWORD: admin
     ports:
       - "5050:80"
+
+  rabbitmq:
+    image: rabbitmq:4.0-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  mailhog:
+    image: mailhog/mailhog
+    ports:
+      - "1025:1025"  # SMTP server
+      - "8025:8025"  # Web UI
 
 volumes:
   db_data:

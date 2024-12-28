@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Start the test-db and pgadmin services
-docker-compose up -d test-db pgadmin
+docker-compose up -d test-db pgadmin rabbitmq
 
 # Wait for the test-db to be ready
 echo "Waiting for test-db to be ready..."
@@ -22,7 +22,7 @@ cd auth-service
 
 # Run the tests
 echo "Running tests..."
-go test ./internal/tests/
+go test -v ./internal/tests/
 
 # Stop the test-db and pgadmin services
 docker-compose down

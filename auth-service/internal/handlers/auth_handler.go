@@ -5,19 +5,22 @@ import (
 	"log"
 	"net/http"
 
+	"auth-service/internal/events"
 	"auth-service/internal/models"
 	"auth-service/internal/utils"
 	"auth-service/repository"
 
 	"github.com/go-playground/validator/v10"
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type AuthHandler struct {
-	repo repository.AuthRepository
+	repo         repository.AuthRepository
+	rabbitMQConn *amqp.Connection
 }
 
-func NewAuthHandler(repo repository.AuthRepository) *AuthHandler {
-	return &AuthHandler{repo: repo}
+func NewAuthHandler(repo repository.AuthRepository, rabbitMQConn *amqp.Connection) *AuthHandler {
+	return &AuthHandler{repo: repo, rabbitMQConn: rabbitMQConn}
 }
 
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
@@ -78,6 +81,13 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	token, err := utils.GenerateJWT(user)
 	if err != nil {
 		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
+		return
+	}
+
+	// Emit login event to RabbitMQ
+	err = events.PublishLoginEvent(h.rabbitMQConn, user.Username)
+	if err != nil {
+		http.Error(w, "Failed to process login event", http.StatusInternalServerError)
 		return
 	}
 
