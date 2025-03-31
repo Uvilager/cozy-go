@@ -1,5 +1,6 @@
 import React from "react";
 import Link from "next/link";
+import { ModeToggle } from "./mode-toggle";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -23,6 +24,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             <Link href="/register" className="hover:text-gray-300">
               Register
             </Link>
+            <ModeToggle />
           </div>
         </nav>
       </header>
