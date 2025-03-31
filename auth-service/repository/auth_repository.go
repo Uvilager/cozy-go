@@ -26,8 +26,8 @@ func NewAuthRepository(db *pgxpool.Pool) AuthRepository {
 
 func (r *authRepository) Authenticate(user models.User) (bool, error) {
 	var storedPassword string
-	err := r.db.QueryRow(context.Background(), "SELECT password FROM users WHERE username=$1", user.Username).Scan(&storedPassword)
-	if err != nil {
+	err := r.db.QueryRow(context.Background(), "SELECT password FROM users WHERE email=$1", user.Email).Scan(&storedPassword)
+	if (err != nil) {
 		if err == pgx.ErrNoRows {
 			return false, errors.New("user not found")
 		}
