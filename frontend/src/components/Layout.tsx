@@ -1,6 +1,7 @@
 import React from "react";
 import Link from "next/link";
 import { ModeToggle } from "./mode-toggle";
+import { Navbar1 } from "./navbar";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -9,7 +10,8 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="bg-gray-800 text-white p-4">
+      <Navbar1></Navbar1>
+      {/* <header className="bg-gray-800 text-white p-4">
         <nav className="container mx-auto flex justify-between">
           <Link href="/" className="text-xl font-bold">
             Cozy Cloud Tasks
@@ -27,9 +29,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             <ModeToggle />
           </div>
         </nav>
-      </header>
+      </header> */}
       <main className="flex-grow container mx-auto p-4">{children}</main>
-      <footer className="bg-gray-200 text-center p-4 mt-auto">
+      <footer className=" text-center p-4 mt-auto">
         &copy; {new Date().getFullYear()} Cozy Cloud Tasks
       </footer>
     </div>
