@@ -11,7 +11,7 @@
 - [ custom navbar ]
 - [ tasks-service validation ]
 - [ write your own validation? ]
-- [ ]
+- [ task service finish repo/handlers/route]
 - [ ]
 - [ ]
 - [ ]
