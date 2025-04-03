@@ -15,7 +15,7 @@
 - [ notes on a board that can have tasks ]
 - [ notifications, maybe google calendar ]
 - [ google auth ]
-- [ ]
+- [ uuid instead of id. zod used string backend is int so changed]
 - [ ]
 - [ ]
 - [ ]
