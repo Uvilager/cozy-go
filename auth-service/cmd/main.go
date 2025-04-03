@@ -12,6 +12,8 @@ import (
 	"auth-service/internal/handlers"
 	"auth-service/internal/routes"
 	"auth-service/repository"
+
+	"github.com/rs/cors"
 )
 
 func main() {
@@ -44,8 +46,21 @@ func main() {
 	// Start HTTP server
 	mux := http.NewServeMux()
 	routes.RegisterRoutes(mux, authHandler, healthHandler, protectedHandler)
+
+	// Configure CORS
+	c := cors.New(cors.Options{
+		AllowedOrigins:   []string{"http://localhost:3000"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Content-Type", "Authorization"},
+		AllowCredentials: true,
+		// Enable Debugging for testing, consider disabling in production
+		// Debug: true,
+	})
+
+	handler := c.Handler(mux)
+
 	log.Println("Starting HTTP server on port 8080")
-	err = http.ListenAndServe(":8080", mux)
+	err = http.ListenAndServe(":8080", handler) // Use the CORS wrapped handler
 	if err != nil {
 		log.Fatalf("Failed to start HTTP server: %v", err)
 	}
