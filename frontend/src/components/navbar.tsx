@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/sheet";
 import { ModeToggle } from "./mode-toggle";
 import Link from "next/link";
+import { DropdownMenuWithAvatar } from "./user-nav";
 
 interface MenuItem {
   title: string;
@@ -166,6 +167,7 @@ const Navbar1 = ({
               <Link href={auth.signup.url}>{auth.signup.title}</Link>
             </Button>
             <ModeToggle />
+            {/* <DropdownMenuWithAvatar /> */}
           </div>
         </nav>
 
