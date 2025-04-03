@@ -26,12 +26,14 @@ func SetupRoutes(mux *http.ServeMux, projectHandler *handlers.ProjectHandler, ta
 	// TODO: Add DELETE /projects/{id}
 
 	// --- Task Routes ---
-	// Note: Assumes Go 1.22+ for path parameters {projectID}
-	mux.HandleFunc("POST /projects/{projectID}/tasks", taskHandler.CreateTask)
-	mux.HandleFunc("GET /projects/{projectID}/tasks", taskHandler.ListTasksByProject)
-	// TODO: Add GET /tasks/{id}
-	// TODO: Add PUT /tasks/{id}
-	// TODO: Add DELETE /tasks/{id}
+	// Note: Assumes Go 1.22+ for path parameters like {projectID} and {taskID}
+	mux.HandleFunc("POST /projects/{projectID}/tasks", taskHandler.CreateTask)       // Create a task within a project
+	mux.HandleFunc("GET /projects/{projectID}/tasks", taskHandler.ListTasksByProject) // List tasks for a specific project
+	mux.HandleFunc("GET /tasks/{taskID}", taskHandler.GetTask)                        // Get a specific task by its ID
+	mux.HandleFunc("PUT /projects/{projectID}/tasks/{taskID}", taskHandler.UpdateTask) // Update a specific task
+	mux.HandleFunc("DELETE /tasks/{taskID}", taskHandler.DeleteTask)                  // Delete a specific task
+	// Optional: Route for updating only status (consider deprecating)
+	mux.HandleFunc("PATCH /tasks/{taskID}/status", taskHandler.UpdateTaskStatusHandler)
 
 	log.Println("Registered API routes")
 }
