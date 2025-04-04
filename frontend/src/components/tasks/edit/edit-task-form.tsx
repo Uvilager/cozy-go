@@ -23,42 +23,45 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { priorities, statuses, labels } from "./data/data"; // Import options
+import { priorities, statuses, labels } from "../data/data"; // Adjusted import path
 
-// Define the Zod schema for the add task form
-// Note: We don't include id, project_id, created_at, updated_at as these are handled by the backend or context
-const addTaskFormSchema = z.object({
+// Define the Zod schema for the edit task form (can be same as add)
+// Include ID if needed for submission, though often it's passed separately
+const editTaskFormSchema = z.object({
   title: z.string().min(1, { message: "Title is required." }).max(255),
   description: z.string().optional(),
-  status: z.string().min(1, { message: "Status is required." }), // Use string to match backend model before validation
-  label: z.string().optional(), // Assuming label can be optional initially
-  priority: z.string().min(1, { message: "Priority is required." }), // Assuming priority is required
-  dueDate: z.date().optional(), // Example: Add due date if needed
+  status: z.string().min(1, { message: "Status is required." }),
+  label: z.string().optional(),
+  priority: z.string().min(1, { message: "Priority is required." }),
+  dueDate: z.date().optional(),
 });
 
-export type AddTaskFormValues = z.infer<typeof addTaskFormSchema>;
+export type EditTaskFormValues = z.infer<typeof editTaskFormSchema>;
 
-interface AddTaskFormProps {
-  onSubmit: (values: AddTaskFormValues) => void; // Callback for form submission
-  isSubmitting: boolean; // To disable button during submission
-  defaultValues?: Partial<AddTaskFormValues>; // Optional default values
+interface EditTaskFormProps {
+  onSubmit: (values: EditTaskFormValues) => void;
+  isSubmitting: boolean;
+  defaultValues: Partial<EditTaskFormValues>; // Default values are required for editing
 }
 
-export function AddTaskForm({
+export function EditTaskForm({
   onSubmit,
   isSubmitting,
   defaultValues,
-}: AddTaskFormProps) {
-  const form = useForm<AddTaskFormValues>({
-    resolver: zodResolver(addTaskFormSchema),
-    defaultValues: defaultValues || {
-      title: "",
-      description: "",
-      status: "todo", // Default status
-      label: "", // Default empty label
-      priority: "medium", // Default priority
-    },
+}: EditTaskFormProps) {
+  const form = useForm<EditTaskFormValues>({
+    resolver: zodResolver(editTaskFormSchema),
+    defaultValues: defaultValues, // Use provided default values
+    mode: "onChange", // Optional: Trigger validation on change
   });
+
+  // Watch for changes if needed, e.g., for debugging
+  // React.useEffect(() => {
+  //   const subscription = form.watch((value, { name, type }) =>
+  //     console.log(value, name, type)
+  //   );
+  //   return () => subscription.unsubscribe();
+  // }, [form.watch]);
 
   return (
     <Form {...form}>
@@ -93,6 +96,8 @@ export function AddTaskForm({
                   placeholder="Add more details about the task..."
                   className="resize-none"
                   {...field}
+                  // Ensure value is handled correctly for optional fields
+                  value={field.value ?? ""}
                 />
               </FormControl>
               <FormMessage />
@@ -178,8 +183,10 @@ export function AddTaskForm({
                 <FormLabel>Label</FormLabel>
                 <Select
                   onValueChange={field.onChange}
-                  defaultValue={field.value}
+                  defaultValue={field.value ?? ""}
                 >
+                  {" "}
+                  {/* Handle null/undefined default */}
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Select label (optional)" />
@@ -203,7 +210,7 @@ export function AddTaskForm({
         {/* TODO: Add Due Date Field if needed */}
 
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? "Adding Task..." : "Add Task"}
+          {isSubmitting ? "Saving Changes..." : "Save Changes"}
         </Button>
       </form>
     </Form>

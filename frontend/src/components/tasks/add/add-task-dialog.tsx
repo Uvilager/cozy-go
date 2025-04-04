@@ -14,8 +14,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { AddTaskForm, AddTaskFormValues } from "./add-task-form";
-import { Task } from "./data/schema"; // Import Task type if needed for API response
+import { AddTaskForm, AddTaskFormValues } from "./add-task-form"; // Adjusted import path
+import { Task } from "../data/schema"; // Adjusted import path
 
 // Define the API endpoint URL
 const API_URL =

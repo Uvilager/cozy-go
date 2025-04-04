@@ -40,7 +40,10 @@ export const columns: ColumnDef<Task>[] = [
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Task" />
     ),
-    cell: ({ row }) => <div className="w-[80px]">{row.getValue("id")}</div>,
+    cell: ({ row }) => {
+      const id = row.getValue("id") as number; // Get the ID (which is a number)
+      return <div className="w-[80px]">{`TASK-${id}`}</div>; // Format the output string
+    },
     enableSorting: false,
     enableHiding: false,
   },
