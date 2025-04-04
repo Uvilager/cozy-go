@@ -4,8 +4,10 @@ import {
   ChevronsUpDownIcon,
   CreditCardIcon,
   LogOut,
+  SettingsIcon,
   SparklesIcon,
 } from "lucide-react";
+import Link from "next/link"; // Import Link
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
@@ -71,13 +73,17 @@ export function DropdownMenuWithAvatar() {
             Account
           </DropdownMenuItem>
           <DropdownMenuItem>
-            <CreditCardIcon />
-            Billing
-          </DropdownMenuItem>
-          <DropdownMenuItem>
             <BellIcon />
             Notifications
           </DropdownMenuItem>
+          <Link href="/settings" passHref>
+            {" "}
+            {/* Wrap with Link */}
+            <DropdownMenuItem>
+              <SettingsIcon />
+              Settings
+            </DropdownMenuItem>
+          </Link>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem>

@@ -167,7 +167,7 @@ const Navbar1 = ({
               <Link href={auth.signup.url}>{auth.signup.title}</Link>
             </Button>
             <ModeToggle />
-            {/* <DropdownMenuWithAvatar /> */}
+            <DropdownMenuWithAvatar />
           </div>
         </nav>
 
