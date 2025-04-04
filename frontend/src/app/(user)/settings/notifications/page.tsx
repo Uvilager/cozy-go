@@ -1,4 +1,4 @@
-import { NotificationsForm } from "@/components/settings/notifications-form";
+import { NotificationsForm } from "@/components/user/settings/notifications-form";
 
 export default function SettingsNotificationsPage() {
   // The layout file handles the title, description, separator, and sidebar.

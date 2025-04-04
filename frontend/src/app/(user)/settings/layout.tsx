@@ -2,7 +2,7 @@ import { Metadata } from "next";
 import Image from "next/image";
 
 import { Separator } from "@/components/ui/separator";
-import { SidebarNav } from "@/components/settings/sidebar-nav"; // Import the new sidebar
+import { SidebarNav } from "@/components/user/settings/sidebar-nav"; // Import the new sidebar
 
 export const metadata: Metadata = {
   title: "Settings",

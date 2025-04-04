@@ -1,4 +1,4 @@
-import { ProfileForm } from "@/components/settings/profile-form";
+import { ProfileForm } from "@/components/user/settings/profile-form";
 
 export default function SettingsProfilePage() {
   // The layout file handles the title, description, separator, and sidebar.
