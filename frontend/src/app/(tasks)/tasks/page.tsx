@@ -38,7 +38,8 @@ async function fetchTasks(projectId: number): Promise<Task[]> {
 }
 
 // Make the component async to use await for prefetching
-export default async function DashboardPage() {
+// Renamed component to reflect its new location/purpose
+export default async function TasksPage() {
   const queryClient = new QueryClient();
 
   // Prefetch the data on the server
