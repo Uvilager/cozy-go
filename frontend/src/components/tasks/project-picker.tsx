@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useProjects } from "@/hooks/useTasks"; // Import the custom hook
+import { useProjects } from "@/hooks/useProjects"; // Corrected import path
 import { Project } from "@/lib/api"; // Import the Project type
 
 // Removed local Project interface definition

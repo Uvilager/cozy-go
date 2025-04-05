@@ -12,18 +12,7 @@ import { queryKeys } from "@/lib/queryKeys"; // Import query keys
 import { Task } from "@/components/tasks/data/schema"; // Import Task type (moved to top)
 import { toast } from "sonner"; // Import toast
 
-/**
- * Custom hook to fetch all projects.
- * Encapsulates the useQuery logic for fetching projects.
- */
-export const useProjects = () => {
-  return useQuery({
-    queryKey: queryKeys.projects, // Use centralized query key
-    queryFn: getProjects, // Use the API function
-    // Optional: Configure staleTime, cacheTime, etc. here or in QueryClientProvider
-    // staleTime: 5 * 60 * 1000, // 5 minutes
-  });
-};
+// useProjects hook moved to useProjects.ts
 
 /**
  * Custom hook to fetch tasks for a specific project ID.
@@ -106,10 +95,15 @@ export const useDeleteTask = (
   return useMutation({
     // The mutation function now expects only the taskId, as projectId is known from the hook's scope
     mutationFn: (taskId: number) => {
+      // ProjectId is needed for invalidation, but not for the API call itself
       if (typeof projectId !== "number") {
-        return Promise.reject(new Error("Project ID is required."));
+        // Still useful to have projectId for invalidation context
+        return Promise.reject(
+          new Error("Project ID context is required for invalidation.")
+        );
       }
-      return deleteTask(projectId, taskId);
+      // Call deleteTask API function with only taskId
+      return deleteTask(taskId);
     },
     onSuccess: () => {
       // Hook's internal success logic
