@@ -19,11 +19,11 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { CustomAlertDialog } from "../alert-dialog"; // Keep existing alert dialog import
+import { CustomAlertDialog } from "../../alert-dialog"; // Keep existing alert dialog import
 
-import { labels } from "./data/data";
-import { taskSchema, Task } from "./data/schema"; // Import Task type
-import { EditTaskDialog } from "./edit/edit-task-dialog"; // Import Edit Dialog
+import { labels } from "../data/data"; // Import labels
+import { taskSchema, Task } from "../data/schema"; // Import Task type
+import { EditTaskDialog } from "../edit/edit-task-dialog"; // Import Edit Dialog
 
 interface DataTableRowActionsProps<TData> {
   row: Row<TData>;
