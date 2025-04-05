@@ -103,4 +103,41 @@ export const createTask = async (
   }
 };
 
-// Add other API functions here as needed (e.g., updateTask, deleteTask, getTaskById, etc.)
+/**
+ * Deletes a specific task within a project.
+ * @param projectId The ID of the project containing the task.
+ * @param taskId The ID of the task to delete.
+ * @returns A promise that resolves when the deletion is successful (API might return 204 No Content or similar).
+ */
+export const deleteTask = async (
+  projectId: number,
+  taskId: number
+): Promise<void> => {
+  // Basic validation
+  if (!projectId || !taskId) {
+    throw new Error("Project ID and Task ID are required to delete a task.");
+  }
+  try {
+    console.log(`API: Deleting task ${taskId}...`); // Removed project ID from log message
+    // DELETE requests typically don't have a request body
+    // Corrected URL based on backend route: /tasks/{taskID}
+    const response = await axiosInstance.delete(`/tasks/${taskId}`);
+    console.log(
+      `API: Task ${taskId} deleted successfully. Status: ${response.status}` // Removed project ID from log message
+    );
+    // Check for successful status codes (e.g., 200 OK, 204 No Content)
+    if (response.status !== 200 && response.status !== 204) {
+      // Optional: Handle unexpected success statuses if needed
+      console.warn(`API: Unexpected status code ${response.status} on delete.`);
+    }
+    // No return value needed for a successful delete typically
+  } catch (error) {
+    console.error(
+      `API Error deleting task ${taskId}:`, // Removed project ID from log message
+      error
+    );
+    throw error; // Re-throw to be handled by useMutation
+  }
+};
+
+// Add other API functions here as needed (e.g., updateTask, getTaskById, etc.)

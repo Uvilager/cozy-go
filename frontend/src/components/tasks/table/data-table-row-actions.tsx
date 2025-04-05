@@ -2,8 +2,8 @@
 
 import { DotsHorizontalIcon } from "@radix-ui/react-icons";
 import { Row } from "@tanstack/react-table";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react"; // Keep useState
+// Removed useMutation, useQueryClient imports
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -19,11 +19,12 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { CustomAlertDialog } from "../../alert-dialog"; // Keep existing alert dialog import
+import { CustomAlertDialog } from "../../alert-dialog";
 
-import { labels } from "../data/data"; // Import labels
-import { taskSchema, Task } from "../data/schema"; // Import Task type
-import { EditTaskDialog } from "../edit/edit-task-dialog"; // Import Edit Dialog
+import { labels } from "../data/data";
+import { Task } from "../data/schema"; // Keep Task type
+import { EditTaskDialog } from "../edit/edit-task-dialog";
+import { useDeleteTask } from "@/hooks/useTasks"; // Import the custom hook
 
 interface DataTableRowActionsProps<TData> {
   row: Row<TData>;
@@ -36,38 +37,34 @@ export function DataTableRowActions<TData>({
   // Note: taskSchema.parse might fail if backend data doesn't perfectly match schema (e.g., nulls)
   // Using direct cast relies on the fetched data being correct.
   const task = row.original as Task;
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false); // Renamed state variable
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false); // State for edit dialog
-  const queryClient = useQueryClient();
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  // Removed queryClient instantiation
 
-  // Keep existing delete mutation
-  const deleteMutation = useMutation({
-    mutationFn: async () => {
-      // Ensure task.id is valid before fetching
-      if (!task || typeof task.id !== "number") {
-        throw new Error("Invalid task ID for deletion.");
-      }
-      await fetch(`http://localhost:8081/tasks/${task.id}`, {
-        method: "DELETE",
-      });
-    },
-    onSuccess: () => {
-      setIsDeleteDialogOpen(false); // Close delete dialog on success
-      // Use the correct project ID for invalidation if possible
-      const projectId = task?.project_id ?? 1; // Default to 1 if project_id is missing
-      queryClient.invalidateQueries({ queryKey: ["tasks", projectId] });
-    },
-    onError: (error) => {
-      // Handle delete error (e.g., show toast)
-      console.error("Delete failed:", error);
-      setIsDeleteDialogOpen(false); // Close dialog even on error? Or keep open?
-    },
-  });
+  // Use the custom hook for deletion
+  const { mutate: deleteTaskMutate, isPending: isDeleting } = useDeleteTask(
+    task?.project_id, // Pass the projectId from the task
+    {
+      onSuccess: () => {
+        setIsDeleteDialogOpen(false); // Close dialog on success
+        // Toast notification is handled within the hook
+      },
+      onError: (error) => {
+        // Toast notification is handled within the hook
+        // Optionally keep dialog open on error? For now, let's close it.
+        setIsDeleteDialogOpen(false);
+      },
+    }
+  );
 
   const handleDelete = () => {
+    if (!task || typeof task.id !== "number") {
+      console.error("Invalid task or task ID for deletion.");
+      // Optionally show a toast error here
+      return;
+    }
     console.log("Deleting task:", task.id);
-    deleteMutation.mutate();
-    // Don't set dialog state here, onSuccess/onError handles it
+    deleteTaskMutate(task.id); // Call mutate from the hook with taskId
   };
 
   return (
@@ -123,8 +120,9 @@ export function DataTableRowActions<TData>({
         description={`Are you sure you want to delete task "TASK-${task.id}"? This action cannot be undone.`}
         onConfirm={handleDelete}
         onCancel={() => setIsDeleteDialogOpen(false)}
-        confirmText="Delete"
+        confirmText={isDeleting ? "Deleting..." : "Delete"} // Show loading state on button
         cancelText="Cancel"
+        isConfirmDisabled={isDeleting} // Disable confirm button while deleting
       />
 
       {/* Add Edit Dialog */}

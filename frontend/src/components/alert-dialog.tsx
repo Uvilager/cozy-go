@@ -19,6 +19,7 @@ interface CustomAlertDialogProps {
   cancelText: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  isConfirmDisabled?: boolean; // Add optional prop
 }
 
 export function CustomAlertDialog({
@@ -30,6 +31,7 @@ export function CustomAlertDialog({
   cancelText,
   open,
   onOpenChange,
+  isConfirmDisabled = false, // Default to false
 }: CustomAlertDialogProps) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -40,7 +42,8 @@ export function CustomAlertDialog({
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel onClick={onCancel}>{cancelText}</AlertDialogCancel>
-          <AlertDialogAction onClick={onConfirm}>
+          {/* Add disabled attribute based on the prop */}
+          <AlertDialogAction onClick={onConfirm} disabled={isConfirmDisabled}>
             {confirmText}
           </AlertDialogAction>
         </AlertDialogFooter>

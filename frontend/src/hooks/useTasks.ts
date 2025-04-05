@@ -84,4 +84,44 @@ export const useCreateTask = (
   });
 };
 
+// Import deleteTask API function
+import { deleteTask } from "@/lib/api";
+
+/**
+ * Custom hook for deleting a task.
+ * Encapsulates the useMutation logic for task deletion.
+ * @param projectId The ID of the project the task belongs to (needed for query invalidation).
+ * @param options Optional callbacks like onSuccess, onError.
+ */
+export const useDeleteTask = (
+  projectId: number | undefined,
+  options?: { onSuccess?: () => void; onError?: (error: Error) => void }
+) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    // The mutation function now expects only the taskId, as projectId is known from the hook's scope
+    mutationFn: (taskId: number) => {
+      if (typeof projectId !== "number") {
+        return Promise.reject(new Error("Project ID is required."));
+      }
+      return deleteTask(projectId, taskId);
+    },
+    onSuccess: () => {
+      // Hook's internal success logic
+      toast.success("Task deleted successfully!");
+      // Invalidate the tasks query for the specific project
+      queryClient.invalidateQueries({ queryKey: queryKeys.tasks(projectId) });
+      // Call the onSuccess callback passed from the component, if any
+      options?.onSuccess?.();
+    },
+    onError: (error: Error) => {
+      // Hook's internal error logic
+      toast.error(`Failed to delete task: ${error.message}`);
+      // Call the onError callback passed from the component, if any
+      options?.onError?.(error);
+    },
+  });
+};
+
 // Add other task-related hooks here as needed (e.g., useTaskById, useUpdateTask, etc.)
