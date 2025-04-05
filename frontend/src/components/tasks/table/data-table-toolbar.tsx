@@ -13,10 +13,12 @@ import { DataTableFacetedFilter } from "./data-table-faceted-filter";
 
 interface DataTableToolbarProps<TData> {
   table: Table<TData>;
+  projectId: number | undefined; // Add projectId prop
 }
 
 export function DataTableToolbar<TData>({
   table,
+  projectId, // Destructure projectId
 }: DataTableToolbarProps<TData>) {
   const isFiltered = table.getState().columnFilters.length > 0;
 
@@ -57,10 +59,10 @@ export function DataTableToolbar<TData>({
         )}
       </div>
       <div className="flex items-center space-x-2">
-        {" "}
         {/* Wrapper for right-side controls */}
         <DataTableViewOptions table={table} />
-        <AddTaskDialog /> {/* Add the button/dialog here */}
+        {/* Pass projectId to AddTaskDialog */}
+        <AddTaskDialog projectId={projectId} />
       </div>
     </div>
   );

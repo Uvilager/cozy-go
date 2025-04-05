@@ -1,76 +1,51 @@
 "use client"; // This component uses hooks
 
 import React from "react";
-import { useQuery } from "@tanstack/react-query";
-import { columns } from "@/components/tasks/table/columns";
-import { DataTable } from "@/components/tasks/table/data-table";
+// Removed useQuery import as it's now in the hook
+import { columns } from "@/components/tasks/table/columns"; // Adjusted path based on file structure
+import { DataTable } from "@/components/tasks/table/data-table"; // Adjusted path based on file structure
 import { Task } from "@/components/tasks/data/schema";
+import { useTasksByProject } from "@/hooks/useTasks"; // Import the custom hook
 
-// Re-define or import fetchTasks and API_URL if not accessible globally
-// (For simplicity, duplicating fetchTasks here, consider moving to a shared api lib)
-// Define API_URL here or import from a shared config
-const API_URL =
-  process.env.NEXT_PUBLIC_TASK_SERVICE_URL || "http://localhost:8081";
-// No longer hardcode projectId here
-
-// Keep fetchTasks for client-side refetches
-async function fetchTasks(projectId: number): Promise<Task[]> {
-  console.log(
-    `CLIENT: Fetching tasks for project ${projectId} from ${API_URL}...`
-  );
-  const response = await fetch(`${API_URL}/projects/${projectId}/tasks`);
-  if (!response.ok) {
-    const errorText = await response.text(); // Get more error details
-    console.error("Fetch error:", response.status, errorText); // Log error details
-    throw new Error(
-      `Failed to fetch tasks: ${response.statusText} - ${errorText}`
-    );
-  }
-  const data = await response.json();
-  console.log("Tasks fetched successfully:", data); // Log success
-  return Array.isArray(data) ? data : [];
-}
+// Removed duplicated fetchTasks and API_URL
 
 // Define props interface
 interface TaskTableClientProps {
-  projectId: number; // Expect projectId as a prop
+  projectId: number | undefined; // Allow undefined projectId
 }
 
 export default function TaskTableClient({ projectId }: TaskTableClientProps) {
+  // Use the custom hook to fetch tasks
   const {
     data: tasksData,
-    isLoading, // Still useful for background loading indicators
-    isError,
-    error,
-  } = useQuery<Task[], Error>({
-    // This queryKey MUST match the one used for prefetching on the server
-    queryKey: ["tasks", projectId], // Use the projectId prop in the query key
-    queryFn: () => fetchTasks(projectId), // Use the projectId prop in the fetch function
-    // Ensure this component only fetches if projectId is valid (though parent handles this)
-    enabled: !!projectId,
-    // staleTime is inherited from QueryClientProvider defaults, or can be set here.
-  });
+    isLoading, // Use loading state from the hook
+    isError, // Use error state from the hook
+    error, // Use error object from the hook
+  } = useTasksByProject(projectId); // Pass projectId to the hook
 
-  // Although data is prefetched, isLoading might be true briefly initially
-  // or during background refetches. You might want a subtle loading indicator.
-  // For initial load, hydration handles the "no loading state" experience.
+  // Handle loading state (initial load is handled by hydration, but this catches refetches)
+  if (isLoading && !tasksData) {
+    // Show a loading indicator only if there's no data yet (initial load/hydration failed?)
+    return <div>Loading tasks...</div>;
+  }
 
-  // Handle error state (e.g., if refetch fails)
-  if (isError && !tasksData) {
-    // Only show full error if there's no data at all
+  // Handle error state
+  if (isError) {
+    // Display error message. Check if error is an AxiosError for more details.
+    const errorMessage =
+      error instanceof Error ? error.message : "An unknown error occurred";
     return (
-      <div className="text-red-600">
-        Error fetching tasks: {error?.message || "Unknown error"}
-      </div>
+      <div className="text-red-600">Error fetching tasks: {errorMessage}</div>
     );
   }
 
-  // Data is either hydrated from the server or fetched client-side.
-  // Provide a default empty array if tasksData is undefined initially.
+  // Data is either hydrated from the server or fetched successfully client-side.
+  // Default to empty array if data is still undefined (shouldn't happen if not loading/erroring)
   const data = tasksData ?? [];
 
-  // Optional: Show subtle loading state for background refetches
-  // if (isLoading && tasksData) { ... show subtle indicator ... }
+  // Optional: Show subtle loading state for background refetches even if data exists
+  // if (isLoading) { ... show subtle indicator on top of the table ... }
 
-  return <DataTable columns={columns} data={data} />;
+  // Render the DataTable with the fetched or hydrated data, passing projectId
+  return <DataTable columns={columns} data={data} projectId={projectId} />;
 }

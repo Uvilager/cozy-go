@@ -8,24 +8,35 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"; // Assuming you have a Select component from shadcn/ui
+} from "@/components/ui/select";
+import { useProjects } from "@/hooks/useTasks"; // Import the custom hook
+import { Project } from "@/lib/api"; // Import the Project type
 
-// Define a simple type for the project prop
-interface Project {
-  id: number;
-  name: string;
-  // Add other relevant project fields if needed
-}
+// Removed local Project interface definition
 
+// Update props: remove projects, keep currentProjectId from URL
 interface ProjectPickerProps {
-  projects: Project[];
   currentProjectId: string | undefined; // Project ID from URL params
 }
 
-export function ProjectPicker({
-  projects,
-  currentProjectId,
-}: ProjectPickerProps) {
+export function ProjectPicker({ currentProjectId }: ProjectPickerProps) {
+  // Fetch projects using the hook
+  const { data: projectsData, isLoading, isError, error } = useProjects();
+  const projects = projectsData ?? []; // Use fetched data, default to empty array
+
+  // Handle loading state
+  if (isLoading) {
+    // You might want a more subtle loading indicator like a disabled select
+    return <div className="mb-4">Loading projects...</div>;
+  }
+
+  // Handle error state
+  if (isError) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Failed to load projects";
+    return <div className="mb-4 text-red-600">{errorMessage}</div>;
+  }
+
   const router = useRouter();
   const searchParams = useSearchParams();
 

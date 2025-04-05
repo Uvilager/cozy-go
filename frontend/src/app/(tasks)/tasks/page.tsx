@@ -5,60 +5,16 @@ import {
   QueryClient,
   dehydrate,
 } from "@tanstack/react-query";
-import { Task } from "@/components/tasks/data/schema"; // Import the Task type
-import TaskTableClient from "@/components/tasks/task-table-client"; // Import the new client component
-import { ProjectPicker } from "@/components/tasks/project-picker"; // Import the ProjectPicker
+// Task type might be needed if we handle data directly, but likely not with hooks/api layer
+// import { Task } from "@/components/tasks/data/schema";
+import TaskTableClient from "@/components/tasks/task-table-client";
+import { ProjectPicker } from "@/components/tasks/project-picker";
+// Import Project type along with API functions
+import { Project, getProjects, getTasksByProject } from "@/lib/api";
+import { queryKeys } from "@/lib/queryKeys"; // Import query keys
 
-// Define the API endpoint URL (adjust if your backend runs elsewhere)
-// Assuming task-service is running and accessible via localhost:8081
-const API_URL =
-  process.env.NEXT_PUBLIC_TASK_SERVICE_URL || "http://localhost:8081";
-
-// Define a simple type for Project (adjust if needed based on your API)
-interface Project {
-  id: number;
-  name: string;
-}
-
-// Function to fetch all projects
-async function fetchProjects(): Promise<Project[]> {
-  console.log(`SERVER: Fetching projects from ${API_URL}...`);
-  const response = await fetch(`${API_URL}/projects`, { cache: "no-store" });
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error("SERVER Fetch projects error:", response.status, errorText);
-    throw new Error(
-      `Failed to fetch projects: ${response.statusText} - ${errorText}`
-    );
-  }
-  const data = await response.json();
-  console.log("SERVER: Projects fetched successfully:", data);
-  return Array.isArray(data) ? data : [];
-}
-
-// Function to fetch tasks for a specific project
-// TODO: Make projectId dynamic if needed
-const projectId = 1; // This will be replaced soon
-async function fetchTasks(projectId: number): Promise<Task[]> {
-  // Fetching on the server - can use direct fetch
-  console.log(
-    `SERVER: Fetching tasks for project ${projectId} from ${API_URL}...`
-  );
-  const response = await fetch(`${API_URL}/projects/${projectId}/tasks`, {
-    cache: "no-store", // Ensure fresh data is fetched on each request for server components
-  });
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error("SERVER Fetch error:", response.status, errorText);
-    // Decide how to handle server-side fetch errors - maybe throw to trigger error boundary?
-    throw new Error(
-      `Failed to fetch tasks: ${response.statusText} - ${errorText}`
-    );
-  }
-  const data = await response.json();
-  console.log("SERVER: Tasks fetched successfully:", data);
-  return Array.isArray(data) ? data : [];
-}
+// Removed old fetch functions and Project interface (assuming it's defined/exported elsewhere if needed)
+// API_URL is now handled within the axios instance/API layer
 
 // Make the component async to use await for prefetching
 // Accept searchParams prop for Server Components
@@ -69,30 +25,52 @@ export default async function TasksPage({
 }) {
   const queryClient = new QueryClient();
 
-  // Fetch projects first
-  const projects = await fetchProjects();
+  // Prefetch projects first
+  try {
+    await queryClient.prefetchQuery({
+      queryKey: queryKeys.projects,
+      queryFn: getProjects,
+    });
+  } catch (error) {
+    console.error("TasksPage: Failed to prefetch projects on server:", error);
+    // Handle prefetch error if necessary (e.g., log)
+  }
 
-  // Determine the projectId to use
-  // Get from URL search params, default to the first project if available, or handle no projects case
+  // We no longer get projects data here on the server.
+  // ProjectPicker client component will use the useProjects hook.
+
+  // Determine the projectId to use based *only* on URL search params for server prefetch.
+  // The client-side ProjectPicker will handle defaulting if the param is missing/invalid.
   const currentProjectIdParam = searchParams?.projectId as string | undefined;
   let projectIdToFetch: number | undefined;
 
-  if (
-    currentProjectIdParam &&
-    projects.some((p) => p.id.toString() === currentProjectIdParam)
-  ) {
-    projectIdToFetch = parseInt(currentProjectIdParam, 10);
-  } else if (projects.length > 0) {
-    projectIdToFetch = projects[0].id; // Default to the first project
+  // Try to parse the ID from the URL param. No fallback logic here on the server.
+  if (currentProjectIdParam) {
+    const parsedId = parseInt(currentProjectIdParam, 10);
+    if (!isNaN(parsedId)) {
+      projectIdToFetch = parsedId;
+      // We don't validate against the actual project list here anymore,
+      // as we don't have it readily available without getQueryData.
+      // If the ID is invalid, the task prefetch might fail gracefully or fetch nothing.
+    }
   }
 
   // Prefetch the task data only if a valid project ID is determined
   if (projectIdToFetch !== undefined) {
-    await queryClient.prefetchQuery({
-      // This queryKey MUST match the one used in TaskTableClient
-      queryKey: ["tasks", projectIdToFetch], // Use the dynamic project ID
-      queryFn: () => fetchTasks(projectIdToFetch), // Use the dynamic project ID
-    });
+    try {
+      await queryClient.prefetchQuery({
+        // Use the centralized query key
+        queryKey: queryKeys.tasks(projectIdToFetch),
+        // Use the new API function
+        queryFn: () => getTasksByProject(projectIdToFetch),
+      });
+    } catch (error) {
+      console.error(
+        `TasksPage: Failed to prefetch tasks for project ${projectIdToFetch} on server:`,
+        error
+      );
+      // Handle prefetch error if necessary (e.g., log, but maybe don't block rendering)
+    }
   }
 
   // Dehydrate the query client's cache
@@ -102,18 +80,17 @@ export default async function TasksPage({
     // Pass the dehydrated state to the boundary
     <HydrationBoundary state={dehydratedState}>
       <div className="container mx-auto py-10">
-        {/* Render the Project Picker */}
-        <ProjectPicker
-          projects={projects}
-          currentProjectId={currentProjectIdParam}
-        />
+        {/* Render the Project Picker - no longer passing projects prop */}
+        <ProjectPicker currentProjectId={currentProjectIdParam} />
         <h1 className="text-3xl font-bold mb-6">Task Management</h1>
+        {/* Removed duplicate heading */}
         {/* Render the Client Component, passing the projectId it should use */}
-        {/* Conditionally render TaskTableClient only if a project is selected */}
+        {/* Conditionally render TaskTableClient */}
         {projectIdToFetch !== undefined ? (
           <TaskTableClient projectId={projectIdToFetch} />
         ) : (
-          <div>Please select a project to view tasks.</div> // Or some other placeholder
+          // Simplified fallback message as we don't have project count here
+          <div>Please select a project to view tasks.</div>
         )}
       </div>
     </HydrationBoundary>

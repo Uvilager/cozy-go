@@ -31,11 +31,13 @@ import { DataTableToolbar } from "./data-table-toolbar";
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
+  projectId: number | undefined; // Add projectId prop
 }
 
 export function DataTable<TData, TValue>({
   columns,
   data,
+  projectId, // Destructure projectId
 }: DataTableProps<TData, TValue>) {
   const [rowSelection, setRowSelection] = React.useState({});
   const [columnVisibility, setColumnVisibility] =
@@ -69,7 +71,8 @@ export function DataTable<TData, TValue>({
 
   return (
     <div className="space-y-4">
-      <DataTableToolbar table={table} />
+      {/* Pass projectId to DataTableToolbar */}
+      <DataTableToolbar table={table} projectId={projectId} />
       <div className="rounded-md border">
         <Table>
           <TableHeader>
