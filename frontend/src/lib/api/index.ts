@@ -140,4 +140,51 @@ export const deleteTask = async (
   }
 };
 
-// Add other API functions here as needed (e.g., updateTask, getTaskById, etc.)
+// Define the type for the data needed to update a task
+// This might be similar to CreateTaskPayload but often allows partial updates
+// Let's assume it can accept any field from the Task schema for now
+// Ideally, this would be more specific based on what the API allows updating
+export type UpdateTaskPayload = Partial<
+  Omit<Task, "id" | "project_id" | "created_at" | "updated_at">
+>;
+
+/**
+ * Updates an existing task.
+ * @param taskId The ID of the task to update.
+ * @param taskData The data to update the task with.
+ * @param projectId The ID of the project containing the task.
+ * @returns A promise that resolves to the updated task.
+ */
+export const updateTask = async (
+  projectId: number, // Add projectId
+  taskId: number,
+  taskData: UpdateTaskPayload
+): Promise<Task> => {
+  if (!projectId || !taskId) {
+    throw new Error("Project ID and Task ID are required to update a task.");
+  }
+  try {
+    console.log(
+      `API: Updating task ${taskId} in project ${projectId}...`,
+      taskData
+    );
+    // Corrected URL based on backend route
+    const response = await axiosInstance.put<Task>(
+      `/projects/${projectId}/tasks/${taskId}`,
+      taskData
+    );
+    console.log(
+      `API: Task ${taskId} in project ${projectId} updated successfully:`,
+      response.data
+    );
+    return response.data;
+  } catch (error) {
+    console.error(
+      `API Error updating task ${taskId} in project ${projectId}:`,
+      error
+    );
+    throw error; // Re-throw to be handled by useMutation
+  }
+};
+
+// Add other API functions here as needed (e.g., getTaskById, etc.)

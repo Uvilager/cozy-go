@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+// Removed useMutation, useQueryClient imports
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
+// Removed Button import (not used directly)
 import {
   Dialog,
   DialogContent,
@@ -15,47 +15,10 @@ import {
   // DialogTrigger, // Trigger will be handled manually in row actions
 } from "@/components/ui/dialog";
 import { EditTaskForm, EditTaskFormValues } from "./edit-task-form";
-import { Task } from "../data/schema"; // Adjusted import path
-
-// Define the API endpoint URL
-const API_URL =
-  process.env.NEXT_PUBLIC_TASK_SERVICE_URL || "http://localhost:8081";
-
-// Function to update an existing task
-// Assumes API expects PUT /projects/{projectID}/tasks/{taskID}
-async function updateTask(taskData: Task): Promise<Task> {
-  // Expect full Task object including ID and ProjectID
-  const { id, project_id, ...payload } = taskData; // Extract IDs
-
-  // Remove empty optional fields if backend expects them to be absent
-  if ("description" in payload && payload.description === "") {
-    delete (payload as any).description;
-  }
-  if ("label" in payload && payload.label === "") {
-    delete (payload as any).label;
-  }
-  // TODO: Handle dueDate formatting if included
-
-  const response = await fetch(
-    `${API_URL}/projects/${project_id}/tasks/${id}`,
-    {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload), // Send payload without IDs in body
-    }
-  );
-
-  if (!response.ok) {
-    const errorData = await response.text();
-    console.error("Update task error:", response.status, errorData);
-    throw new Error(
-      `Failed to update task: ${response.statusText} - ${errorData}`
-    );
-  }
-  return response.json(); // Assuming API returns the updated task
-}
+import { Task } from "../data/schema";
+// Removed local updateTask function and API_URL
+import { useUpdateTask } from "@/hooks/useTasks"; // Import the custom hook
+// Removed queryKeys import (handled by hook)
 
 interface EditTaskDialogProps {
   task: Task; // The task data to edit
@@ -68,10 +31,9 @@ export function EditTaskDialog({
   isOpen,
   onOpenChange,
 }: EditTaskDialogProps) {
-  const queryClient = useQueryClient();
+  // Removed queryClient instantiation
 
-  // Map Task to EditTaskFormValues (handle potential type differences if any)
-  // Ensure defaultValues are updated when the task prop changes
+  // Map Task to EditTaskFormValues
   const [defaultValues, setDefaultValues] = useState<
     Partial<EditTaskFormValues>
   >({});
@@ -89,29 +51,26 @@ export function EditTaskDialog({
     }
   }, [task]);
 
-  const mutation = useMutation({
-    mutationFn: updateTask,
-    onSuccess: (data) => {
-      toast.success(`Task "${data.title}" updated successfully!`);
-      // Invalidate the tasks query to refetch data and update the table
-      // Use the correct project ID from the task data
-      queryClient.invalidateQueries({ queryKey: ["tasks", task.project_id] });
-      onOpenChange(false); // Close the dialog on success
-    },
-    onError: (error) => {
-      toast.error(`Failed to update task: ${error.message}`);
-    },
-  });
+  // Use the custom hook for updating
+  const { mutate: updateTaskMutate, isPending: isSubmitting } = useUpdateTask(
+    task?.project_id, // Pass projectId for invalidation
+    {
+      onSuccess: (updatedTask) => {
+        // Toast is handled by hook
+        onOpenChange(false); // Close dialog on success
+      },
+      // onError is handled by hook
+    }
+  );
 
   const handleFormSubmit = (values: EditTaskFormValues) => {
-    console.log("Updating task:", values);
-    // Combine form values with necessary IDs before sending to mutation
-    const taskToUpdate: Task = {
-      ...task, // Include original ID, ProjectID, CreatedAt etc.
-      ...values, // Override with updated form values
-      // Ensure types match Task if EditTaskFormValues differs significantly
-    };
-    mutation.mutate(taskToUpdate);
+    if (!task || typeof task.id !== "number") {
+      toast.error("Cannot update task: Invalid task data.");
+      return;
+    }
+    console.log("Updating task:", task.id, values);
+    // Call the mutate function from the hook, passing taskId and the form values
+    updateTaskMutate({ taskId: task.id, taskData: values });
   };
 
   // Don't render the dialog if there's no task data (e.g., initial state)
@@ -131,9 +90,10 @@ export function EditTaskDialog({
           </DialogDescription>
         </DialogHeader>
         {/* Pass defaultValues derived from the task prop */}
+        {/* Pass defaultValues derived from the task prop */}
         <EditTaskForm
           onSubmit={handleFormSubmit}
-          isSubmitting={mutation.isPending}
+          isSubmitting={isSubmitting} // Pass loading state from hook
           defaultValues={defaultValues}
         />
       </DialogContent>

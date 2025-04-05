@@ -1,6 +1,16 @@
-import { useQuery } from "@tanstack/react-query";
-import { getProjects, getTasksByProject } from "@/lib/api"; // Import API functions
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"; // Consolidate imports
+import {
+  getProjects,
+  getTasksByProject,
+  createTask,
+  CreateTaskPayload,
+  deleteTask,
+  updateTask,
+  UpdateTaskPayload,
+} from "@/lib/api"; // Import API functions
 import { queryKeys } from "@/lib/queryKeys"; // Import query keys
+import { Task } from "@/components/tasks/data/schema"; // Import Task type (moved to top)
+import { toast } from "sonner"; // Import toast
 
 /**
  * Custom hook to fetch all projects.
@@ -42,10 +52,7 @@ export const useTasksByProject = (projectId: number | undefined) => {
   });
 };
 
-// Import mutation-related types and functions
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { createTask, CreateTaskPayload } from "@/lib/api";
-import { toast } from "sonner";
+// Removed duplicate imports below
 
 /**
  * Custom hook for creating a new task.
@@ -84,9 +91,6 @@ export const useCreateTask = (
   });
 };
 
-// Import deleteTask API function
-import { deleteTask } from "@/lib/api";
-
 /**
  * Custom hook for deleting a task.
  * Encapsulates the useMutation logic for task deletion.
@@ -122,6 +126,58 @@ export const useDeleteTask = (
       options?.onError?.(error);
     },
   });
+}; // Added missing closing brace from previous error description
+
+// Removed duplicate imports below
+
+/**
+ * Custom hook for updating an existing task.
+ * Encapsulates the useMutation logic for task updates.
+ * @param projectId The ID of the project the task belongs to (needed for query invalidation).
+ * @param options Optional callbacks like onSuccess, onError.
+ */
+export const useUpdateTask = (
+  projectId: number | undefined,
+  options?: {
+    onSuccess?: (updatedTask: Task) => void;
+    onError?: (error: Error) => void;
+  }
+) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    // The mutation function expects an object with taskId and the update payload
+    mutationFn: (variables: {
+      taskId: number;
+      taskData: UpdateTaskPayload;
+    }) => {
+      const { taskId, taskData } = variables;
+      // Project ID is needed for the API call now, not just invalidation
+      if (typeof projectId !== "number") {
+        return Promise.reject(
+          new Error("Project ID is required to update task.")
+        );
+      }
+      // Pass projectId, taskId, and taskData to the API function
+      return updateTask(projectId, taskId, taskData);
+    },
+    onSuccess: (updatedTask) => {
+      // Hook's internal success logic
+      toast.success(`Task "${updatedTask.title}" updated successfully!`);
+      // Invalidate the tasks query for the specific project
+      queryClient.invalidateQueries({ queryKey: queryKeys.tasks(projectId) });
+      // Optional: Update the specific task query cache if you have one (e.g., queryKeys.task(updatedTask.id))
+      // queryClient.setQueryData(queryKeys.task(updatedTask.id), updatedTask);
+      // Call the onSuccess callback passed from the component, if any
+      options?.onSuccess?.(updatedTask);
+    },
+    onError: (error: Error) => {
+      // Hook's internal error logic
+      toast.error(`Failed to update task: ${error.message}`);
+      // Call the onError callback passed from the component, if any
+      options?.onError?.(error);
+    },
+  });
 };
 
-// Add other task-related hooks here as needed (e.g., useTaskById, useUpdateTask, etc.)
+// Add other task-related hooks here as needed (e.g., useTaskById)

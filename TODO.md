@@ -28,7 +28,7 @@
 - [ add crud for projects. create/delete/edit]
 - [ edit/delete tasks reform code ]
 - [ default project selected on load ]
-- [ ]
+- [ edit task backend update to only use changed field on the frontend and not whole object ]
 - [ ]
 - [ ]
 - [ ]
