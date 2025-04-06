@@ -1,7 +1,11 @@
 import React from "react";
-import Link from "next/link";
-import { ModeToggle } from "./mode-toggle";
-import { Navbar1 } from "./navbar";
+// Link and ModeToggle are used within Navbar now, no longer needed here directly
+// import Link from "next/link";
+// import { ModeToggle } from "./mode-toggle";
+// Import the new Navbar using path alias
+import { Navbar } from "./navbar/navbar";
+// Import the new Footer
+import { Footer } from "./footer/footer";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -10,7 +14,8 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   return (
     <div className="min-h-screen flex flex-col">
-      <Navbar1></Navbar1>
+      {/* Use the new Navbar component */}
+      <Navbar />
       {/* <header className="bg-gray-800 text-white p-4">
         <nav className="container mx-auto flex justify-between">
           <Link href="/" className="text-xl font-bold">
@@ -31,9 +36,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         </nav>
       </header> */}
       <main className="flex-grow container mx-auto p-4">{children}</main>
-      <footer className=" text-center p-4 mt-auto">
-        &copy; {new Date().getFullYear()} Cozy Cloud Tasks
-      </footer>
+      {/* Use the new Footer component */}
+      <Footer />
     </div>
   );
 };
