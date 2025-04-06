@@ -28,10 +28,21 @@ export const getTasksByProject = async (projectId: number): Promise<Task[]> => {
     const response = await axiosInstance.get<Task[]>(
       `/projects/${projectId}/tasks`
     );
+
+    // Check for successful status code
+    if (response.status !== 200) {
+      console.warn(
+        `API: Unexpected status code ${response.status} fetching tasks for project ${projectId}.`
+      );
+      // throw new Error(`Failed to fetch tasks: Status ${response.status}`);
+      return []; // Return empty array for non-200 status
+    }
+
     console.log(
       `API: Tasks for project ${projectId} fetched successfully:`,
       response.data
     );
+    // Basic check if data is an array (can be enhanced later)
     return Array.isArray(response.data) ? response.data : [];
   } catch (error) {
     console.error(`API Error fetching tasks for project ${projectId}:`, error);
@@ -59,10 +70,26 @@ export const createTask = async (
       `/projects/${projectId}/tasks`,
       payload
     );
+
+    // Check for successful creation status code
+    if (response.status !== 201) {
+      // 201 Created is typical for successful POST
+      console.warn(
+        `API: Unexpected status code ${response.status} creating task for project ${projectId}. Expected 201.`
+      );
+      // Throw an error because the caller expects a Task object
+      throw new Error(
+        `Failed to create task: Status ${
+          response.status
+        }, Data: ${JSON.stringify(response.data)}`
+      );
+    }
+
     console.log(
       `API: Task for project ${projectId} created successfully:`,
       response.data
     );
+    // We should ideally validate response.data structure here later
     return response.data;
   } catch (error) {
     console.error(`API Error creating task for project ${projectId}:`, error);
@@ -84,12 +111,20 @@ export const deleteTask = async (
   try {
     console.log(`API: Deleting task ${taskId}...`);
     const response = await axiosInstance.delete(`/tasks/${taskId}`);
+    // Check for successful deletion status codes
+    if (response.status !== 200 && response.status !== 204) {
+      // 200 OK or 204 No Content are typical for successful DELETE
+      console.error(
+        `API: Unexpected status code ${response.status} deleting task ${taskId}. Expected 200 or 204.`
+      );
+      throw new Error(
+        `Failed to delete task ${taskId}: Status ${response.status}`
+      );
+    }
+
     console.log(
       `API: Task ${taskId} deleted successfully. Status: ${response.status}`
     );
-    if (response.status !== 200 && response.status !== 204) {
-      console.warn(`API: Unexpected status code ${response.status} on delete.`);
-    }
   } catch (error) {
     console.error(`API Error deleting task ${taskId}:`, error);
     throw error;
@@ -116,10 +151,26 @@ export const updateTask = async (
       `/projects/${projectId}/tasks/${taskId}`,
       taskData
     );
+
+    // Check for successful update status code
+    if (response.status !== 200) {
+      // 200 OK is typical for successful PUT/PATCH
+      console.warn(
+        `API: Unexpected status code ${response.status} updating task ${taskId} in project ${projectId}. Expected 200.`
+      );
+      // Throw an error because the caller expects an updated Task object
+      throw new Error(
+        `Failed to update task: Status ${
+          response.status
+        }, Data: ${JSON.stringify(response.data)}`
+      );
+    }
+
     console.log(
       `API: Task ${taskId} in project ${projectId} updated successfully:`,
       response.data
     );
+    // We should ideally validate response.data structure here later
     return response.data;
   } catch (error) {
     console.error(
