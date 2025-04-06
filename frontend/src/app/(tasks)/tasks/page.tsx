@@ -8,7 +8,7 @@ import {
 // Task type might be needed if we handle data directly, but likely not with hooks/api layer
 // import { Task } from "@/components/tasks/data/schema";
 import TaskTableClient from "@/components/tasks/task-table-client";
-import { ProjectPicker } from "@/components/tasks/project-picker";
+import { ProjectPicker } from "@/components/projects/project-picker";
 // Import Project type along with API functions
 import { Project, getProjects, getTasksByProject } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys"; // Import query keys
@@ -79,20 +79,35 @@ export default async function TasksPage({
   return (
     // Pass the dehydrated state to the boundary
     <HydrationBoundary state={dehydratedState}>
-      <div className="container mx-auto py-10">
-        {/* Render the Project Picker - no longer passing projects prop */}
-        <ProjectPicker currentProjectId={currentProjectIdParam} />
-        <h1 className="text-3xl font-bold mb-6">Task Management</h1>
-        {/* Removed duplicate heading */}
+      {/* Adjusted padding and removed container for full width header possibility */}
+      <div className="space-y-6 p-10 pb-16 md:block">
+        {/* Header Section with Flexbox */}
+        <div className="flex flex-col space-y-4 md:flex-row md:items-center md:justify-between md:space-y-0">
+          {/* Title and Subtitle */}
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight">Tasks</h2>
+            <p className="text-muted-foreground">
+              Manage your tasks and track your progress.
+            </p>
+          </div>
+          {/* Project Picker on the right */}
+          <div className="flex items-center space-x-2">
+            <ProjectPicker currentProjectId={currentProjectIdParam} />
+            {/* Add other actions here if needed, e.g., Add Task Button */}
+          </div>
+        </div>
+
+        {/* Task Table Section */}
         {/* Render the Client Component, passing the projectId it should use */}
         {/* Conditionally render TaskTableClient */}
         {projectIdToFetch !== undefined ? (
           <TaskTableClient projectId={projectIdToFetch} />
         ) : (
           // Simplified fallback message as we don't have project count here
-          <div>Please select a project to view tasks.</div>
+          <div>Please select a project to view its tasks.</div>
         )}
       </div>
+      {/* Removed closing div for container as it's now handled by the outer div */}
     </HydrationBoundary>
   );
 }
