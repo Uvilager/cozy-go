@@ -19,11 +19,11 @@ func SetupRoutes(mux *http.ServeMux, projectHandler *handlers.ProjectHandler, ta
 	})
 
 	// --- Project Routes ---
-	mux.HandleFunc("POST /projects", projectHandler.CreateProject)
-	mux.HandleFunc("GET /projects/{id}", projectHandler.GetProjectByID)
-	mux.HandleFunc("GET /projects", projectHandler.ListProjects)
-	// TODO: Add PUT /projects/{id}
-	// TODO: Add DELETE /projects/{id}
+	mux.HandleFunc("POST /projects", projectHandler.CreateProject)       // Create a new project
+	mux.HandleFunc("GET /projects/{id}", projectHandler.GetProjectByID) // Get a specific project
+	mux.HandleFunc("GET /projects", projectHandler.ListProjects)       // List all projects
+	mux.HandleFunc("PUT /projects/{id}", projectHandler.UpdateProject) // Update a specific project
+	mux.HandleFunc("DELETE /projects/{id}", projectHandler.DeleteProject) // Delete a specific project
 
 	// --- Task Routes ---
 	// Note: Assumes Go 1.22+ for path parameters like {projectID} and {taskID}

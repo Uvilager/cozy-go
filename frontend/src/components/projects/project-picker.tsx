@@ -24,7 +24,13 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"; // Corrected path
 // Input, Label, Textarea are no longer needed here
-import { Check, ChevronsUpDown, FolderKanban, Plus } from "lucide-react";
+import {
+  Check,
+  ChevronsUpDown,
+  FolderKanban,
+  Plus,
+  MoreHorizontal,
+} from "lucide-react"; // Add MoreHorizontal
 import { cn } from "@/lib/utils"; // Corrected path
 import { useProjects } from "@/hooks/useProjects";
 import { Project } from "@/lib/api"; // Assuming Project type is here
@@ -32,6 +38,14 @@ import { Project } from "@/lib/api"; // Assuming Project type is here
 // import { createProject } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
 import { AddProjectDialog } from "./add/add-project-dialog"; // Import the new dialog component
+import { EditProjectDialog } from "./edit/edit-project-dialog"; // Import Edit Dialog
+import { DeleteProjectDialog } from "./delete/delete-project-dialog"; // Import Delete Dialog
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"; // Import Dropdown components
 
 interface ProjectPickerProps {
   currentProjectId: string | undefined; // Project ID from URL params
@@ -43,8 +57,13 @@ export function ProjectPicker({ currentProjectId }: ProjectPickerProps) {
   const queryClient = useQueryClient(); // Get query client instance
 
   const [popoverOpen, setPopoverOpen] = useState(false);
-  const [createDialogOpen, setCreateDialogOpen] = useState(false); // Re-add state for dialog
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  // State for edit/delete dialogs
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingProject, setDeletingProject] = useState<Project | null>(null);
 
   // Fetch projects using the hook
   const { data: projectsData, isLoading, isError, error } = useProjects();
@@ -165,21 +184,66 @@ export function ProjectPicker({ currentProjectId }: ProjectPickerProps) {
               <CommandEmpty>No projects found.</CommandEmpty>
               <CommandGroup>
                 {projects.map((project) => (
-                  <CommandItem
+                  // Wrap CommandItem content in a div for flex layout
+                  <div
                     key={project.id}
-                    value={project.id.toString()} // Use string ID for value/onSelect
-                    onSelect={() => handleProjectSelect(project.id.toString())}
+                    className="flex items-center justify-between w-full"
                   >
-                    <Check
-                      className={cn(
-                        "mr-2 h-4 w-4",
-                        selectedProject?.id === project.id
-                          ? "opacity-100"
-                          : "opacity-0"
-                      )}
-                    />
-                    {project.name}
-                  </CommandItem>
+                    <CommandItem
+                      value={project.id.toString()}
+                      onSelect={() =>
+                        handleProjectSelect(project.id.toString())
+                      }
+                      className="flex-grow cursor-pointer" // Make item take space and be clickable
+                    >
+                      <Check
+                        className={cn(
+                          "mr-2 h-4 w-4",
+                          selectedProject?.id === project.id
+                            ? "opacity-100"
+                            : "opacity-0"
+                        )}
+                      />
+                      <span className="truncate">{project.name}</span>
+                    </CommandItem>
+                    {/* Dropdown Menu for Edit/Delete */}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="ml-2 px-1 h-auto" // Adjust padding/height
+                          onClick={(e) => e.stopPropagation()} // Prevent item selection
+                        >
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent
+                        align="end"
+                        onClick={(e) => e.stopPropagation()} // Prevent closing popover
+                      >
+                        <DropdownMenuItem
+                          onSelect={() => {
+                            setEditingProject(project);
+                            setEditDialogOpen(true);
+                            setPopoverOpen(false); // Close popover
+                          }}
+                        >
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onSelect={() => {
+                            setDeletingProject(project);
+                            setDeleteDialogOpen(true);
+                            setPopoverOpen(false); // Close popover
+                          }}
+                          className="text-red-600" // Destructive action style
+                        >
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 ))}
               </CommandGroup>
               <CommandSeparator />
@@ -206,6 +270,41 @@ export function ProjectPicker({ currentProjectId }: ProjectPickerProps) {
         onOpenChange={setCreateDialogOpen}
         // Optional: Add onSuccess handler if needed
         // onSuccess={() => console.log("Project created successfully!")}
+      />
+
+      {/* Render Edit Dialog */}
+      <EditProjectDialog
+        project={editingProject}
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        onSuccess={() => {
+          setEditingProject(null); // Clear editing project on success/close
+          // Optionally refetch or rely on cache invalidation from hook
+        }}
+      />
+
+      {/* Render Delete Dialog */}
+      <DeleteProjectDialog
+        project={deletingProject}
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onSuccess={() => {
+          setDeletingProject(null); // Clear deleting project on success/close
+          // If the deleted project was the selected one, clear selection or select first
+          if (selectedProject?.id === deletingProject?.id) {
+            const remainingProjects = projects.filter(
+              (p) => p.id !== deletingProject?.id
+            );
+            if (remainingProjects.length > 0) {
+              handleProjectSelect(remainingProjects[0].id.toString());
+            } else {
+              // Handle case where no projects are left - maybe navigate away or show message
+              setSelectedProject(null);
+              // Force page reload or navigate to clear tasks if needed
+              router.push("/tasks"); // Navigate to tasks page without project id
+            }
+          }
+        }}
       />
     </>
   );

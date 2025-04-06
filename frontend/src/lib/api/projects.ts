@@ -15,6 +15,10 @@ export interface CreateProjectPayload {
   description?: string; // Optional description
 }
 
+// Define the type for the data needed to update a project
+// Usually a partial version of the create payload
+export type UpdateProjectPayload = Partial<CreateProjectPayload>;
+
 /**
  * Fetches all projects from the API.
  * @returns A promise that resolves to an array of projects.
@@ -79,6 +83,89 @@ export const createProject = async (
     return response.data;
   } catch (error) {
     console.error("API Error creating project:", error);
+    throw error; // Re-throw to be handled by React Query mutation
+  }
+};
+
+/**
+ * Updates an existing project.
+ * @param projectId The ID of the project to update.
+ * @param projectData The data to update the project with.
+ * @returns A promise that resolves to the updated project.
+ */
+export const updateProject = async (
+  projectId: number,
+  projectData: UpdateProjectPayload
+): Promise<Project> => {
+  if (!projectId) {
+    throw new Error("Project ID is required to update a project.");
+  }
+  try {
+    console.log(`API: Updating project ${projectId}...`, projectData);
+    // Ensure description is not sent if empty, matching backend omitempty
+    const payload = { ...projectData };
+    if (payload.description === "") {
+      delete payload.description;
+    }
+
+    const response = await axiosInstance.put<Project>(
+      `/projects/${projectId}`,
+      payload
+    );
+
+    // Check for successful update status code (usually 200 OK)
+    if (response.status !== 200) {
+      console.warn(
+        `API: Unexpected status code ${response.status} updating project ${projectId}. Expected 200.`
+      );
+      throw new Error(
+        `Failed to update project: Status ${
+          response.status
+        }, Data: ${JSON.stringify(response.data)}`
+      );
+    }
+
+    console.log(
+      `API: Project ${projectId} updated successfully:`,
+      response.data
+    );
+    // TODO: Add validation for response.data structure if needed
+    return response.data;
+  } catch (error) {
+    console.error(`API Error updating project ${projectId}:`, error);
+    throw error; // Re-throw to be handled by React Query mutation
+  }
+};
+
+/**
+ * Deletes a specific project.
+ * @param projectId The ID of the project to delete.
+ * @returns A promise that resolves when the project is deleted.
+ */
+export const deleteProject = async (projectId: number): Promise<void> => {
+  if (!projectId) {
+    throw new Error("Project ID is required to delete a project.");
+  }
+  try {
+    console.log(`API: Deleting project ${projectId}...`);
+    const response = await axiosInstance.delete(`/projects/${projectId}`);
+
+    // Check for successful deletion status codes (usually 200 OK or 204 No Content)
+    if (response.status !== 200 && response.status !== 204) {
+      console.error(
+        `API: Unexpected status code ${response.status} deleting project ${projectId}. Expected 200 or 204.`
+      );
+      throw new Error(
+        `Failed to delete project ${projectId}: Status ${response.status}`
+      );
+    }
+
+    console.log(
+      `API: Project ${projectId} deleted successfully. Status: ${response.status}`
+    );
+    // No data expected on successful delete
+  } catch (error) {
+    console.error(`API Error deleting project ${projectId}:`, error);
     throw error; // Re-throw to be handled by React Query mutation
   }
 };
