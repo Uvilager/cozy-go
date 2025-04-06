@@ -51,12 +51,44 @@ export const useAuthStore = create<AuthState>()(
       // }
     }),
     {
-      name: "auth-storage", // Name of the item in storage (must be unique)
-      storage: createJSONStorage(() => localStorage), // Use localStorage
-      partialize: (state) => ({ token: state.token, user: state.user }), // Only persist token and user
-      // Optional: onRehydrate callback if needed
+      name: "auth-storage",
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({ token: state.token, user: state.user }),
+      // Set isAuthenticated based on token presence after rehydration
+      onRehydrateStorage: () => (state, error) => {
+        if (error) {
+          console.error("AuthStore: Error during rehydration:", error);
+          // If hydration fails, it's safer to ensure the user is logged out
+          // We can't reliably use setState here, but returning undefined might clear it.
+          // Or, handle this post-hydration in an effect. Let's just log for now.
+          return;
+        }
+        console.log("AuthStore: Rehydrating...");
+        if (state) {
+          // Check if state object exists
+          if (state.token) {
+            console.log(
+              "AuthStore: Token found, setting isAuthenticated = true on hydrated state"
+            );
+            // Modify the state object directly - persist middleware applies this
+            state.isAuthenticated = true;
+          } else {
+            console.log(
+              "AuthStore: No token found, ensuring isAuthenticated = false on hydrated state"
+            );
+            // Modify the state object directly
+            state.isAuthenticated = false;
+          }
+        } else {
+          console.log("AuthStore: State is undefined during rehydration.");
+          // If state is undefined after hydration attempt, ensure logged out state
+          // This might require calling clearAuth outside, or setting defaults carefully.
+          // For now, we assume if state is undefined, initial state (false) is correct.
+        }
+      },
+      // Optional: Handle errors during rehydration
       // onRehydrateStorage: (state) => {
-      //   console.log("Hydration finished.");
+      //   console.log("Hydration finished."); // This might log too early
       //   return (state, error) => {
       //     if (error) {
       //       console.error("An error happened during hydration", error);

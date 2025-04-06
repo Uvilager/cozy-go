@@ -6,9 +6,10 @@ import {
   LoginPayload,
   RegisterPayload,
   AuthResponse,
-} from "@/lib/api/auth"; // Import API functions and types
-import { useAuthStore } from "@/store/authStore"; // Import Zustand store
-import { toast } from "sonner"; // For notifications
+} from "@/lib/api/auth";
+import { useAuthStore } from "@/store/authStore";
+import { toast } from "sonner";
+import Cookies from "js-cookie"; // Import js-cookie
 
 /**
  * Custom hook for user login.
@@ -19,13 +20,15 @@ export const useLogin = () => {
   const setAuth = useAuthStore((state) => state.setAuth); // Get the setAuth action
 
   return useMutation<AuthResponse, Error, LoginPayload>({
-    mutationFn: login, // The API function to call for login
+    mutationFn: login,
     onSuccess: (data) => {
-      // On successful login, update the auth state in Zustand store
+      // 1. Update Zustand store
       setAuth(data.token, data.user);
+      // 2. Set cookie for middleware (expires in 7 days, adjust as needed)
+      Cookies.set("authToken", data.token, { expires: 7, path: "/" }); // Use the same name as in middleware
       toast.success("Login successful!");
-      // Redirect to the tasks page (or dashboard) after successful login
-      router.push("/tasks"); // Adjust redirect path if needed
+      // 3. Redirect
+      router.push("/tasks");
     },
     onError: (error) => {
       // Error is already thrown by the API function, React Query catches it
@@ -50,7 +53,7 @@ export const useRegister = () => {
       // On successful registration, show success message
       toast.success(data.message || "Registration successful!");
       // Redirect to the login page after successful registration
-      router.push("/login");
+      // router.push("/login");
     },
     onError: (error) => {
       // Display the error message using toast
@@ -69,10 +72,12 @@ export const useLogout = () => {
     // Perform any necessary API calls for logout here (if applicable)
     // e.g., await axiosInstance.post('/auth/logout');
 
-    // Clear the auth state in Zustand
+    // 1. Clear the auth state in Zustand
     clearAuth();
+    // 2. Remove the auth cookie
+    Cookies.remove("authToken", { path: "/" }); // Use the same name and path
     toast.success("Logged out successfully.");
-    // Redirect to login page
+    // 3. Redirect to login page
     router.push("/login");
   };
 
