@@ -9,9 +9,11 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import React, { useState } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState } from "react"; // Keep useState for form fields
+// No longer need useRouter here, handled by the hook
 import Link from "next/link";
+import { useRegister } from "@/hooks/useAuth"; // Import the register hook
+import { toast } from "sonner"; // Import toast for password mismatch error
 
 export function RegisterForm({
   className,
@@ -20,49 +22,26 @@ export function RegisterForm({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [username, setUsername] = useState(""); // Added username state
-  const router = useRouter();
+  // const [error, setError] = useState(""); // Handled by hook/toast
+  // const [loading, setLoading] = useState(false); // Handled by hook isPending
+  const [username, setUsername] = useState("");
+  // const router = useRouter(); // Handled by hook
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Use the register mutation hook
+  const { mutate: registerMutate, isPending } = useRegister();
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
-    setLoading(true);
 
     if (password !== confirmPassword) {
-      setError("Passwords do not match");
-      setLoading(false);
+      toast.error("Passwords do not match"); // Use toast for this error
       return;
     }
 
-    try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-      const response = await fetch(`${apiUrl}/register`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, password, username }), // Include username
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Registration failed");
-      }
-
-      console.log("Registration successful:", data);
-      router.push("/login");
-    } catch (err: unknown) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError("An unexpected error occurred.");
-      }
-    } finally {
-      setLoading(false);
-    }
+    // Call the mutation function from the hook
+    // Ensure payload matches RegisterPayload (Username, Email, Password)
+    registerMutate({ Username: username, Email: email, Password: password });
+    // The hook's onSuccess/onError handles toast notifications and redirect
   };
 
   return (
@@ -77,10 +56,10 @@ export function RegisterForm({
         <CardContent>
           <form onSubmit={handleSubmit}>
             <div className="flex flex-col gap-6">
-              {error && (
+              {/* Error display is now handled by toast notifications */}
+              {/* {error && (
                 <p className="text-red-500 text-xs italic mt-2">{error}</p>
-              )}
-              {/* Added username input */}
+              )} */}
               <div className="grid gap-3">
                 <Label htmlFor="username">Username</Label>
                 <Input
@@ -90,7 +69,7 @@ export function RegisterForm({
                   required
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  disabled={loading}
+                  disabled={isPending} // Use isPending from hook
                 />
               </div>
               <div className="grid gap-3">
@@ -102,7 +81,7 @@ export function RegisterForm({
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  disabled={loading}
+                  disabled={isPending} // Use isPending from hook
                 />
               </div>
               <div className="grid gap-3">
@@ -113,7 +92,7 @@ export function RegisterForm({
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  disabled={loading}
+                  disabled={isPending} // Use isPending from hook
                   placeholder="••••••••"
                 />
               </div>
@@ -125,12 +104,12 @@ export function RegisterForm({
                   required
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  disabled={loading}
+                  disabled={isPending} // Use isPending from hook
                   placeholder="••••••••"
                 />
               </div>
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Creating account..." : "Sign Up"}
+              <Button type="submit" className="w-full" disabled={isPending}>
+                {isPending ? "Creating account..." : "Sign Up"}
               </Button>
             </div>
             <div className="mt-4 text-center text-sm">

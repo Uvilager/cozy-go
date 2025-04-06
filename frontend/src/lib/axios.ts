@@ -1,33 +1,54 @@
 import axios from "axios";
 
-// Determine the base URL for the task service API
-// Use environment variable if available, otherwise default to localhost
-const API_URL =
+// --- Task Service Axios Instance (Default Export) ---
+const TASK_SERVICE_URL =
   process.env.NEXT_PUBLIC_TASK_SERVICE_URL || "http://localhost:8081";
 
 const axiosInstance = axios.create({
-  baseURL: API_URL,
+  baseURL: TASK_SERVICE_URL,
   headers: {
     "Content-Type": "application/json",
   },
 });
 
-// Later, we can add interceptors here for authentication, logging, etc.
-// For example:
-// axiosInstance.interceptors.request.use(
-//   (config) => {
-//     const token = localStorage.getItem('authToken'); // Or get token from context/store
-//     if (token) {
-//       config.headers.Authorization = `Bearer ${token}`;
-//     }
-//     return config;
-//   },
-//   (error) => {
-//     return Promise.reject(error);
-//   }
-// );
+// --- Auth Service Axios Instance (Named Export) ---
+const AUTH_SERVICE_URL =
+  process.env.NEXT_PUBLIC_AUTH_SERVICE_URL || "http://localhost:8080"; // Default to 8000
 
-// Example response interceptor for global error handling
+export const authAxiosInstance = axios.create({
+  baseURL: AUTH_SERVICE_URL,
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
+
+// --- Interceptors ---
+// Import the Zustand store
+import { useAuthStore } from "@/store/authStore";
+
+// Request interceptor ONLY for the default instance (Task Service)
+axiosInstance.interceptors.request.use(
+  (config) => {
+    // Get token from Zustand store *without* subscribing to changes
+    // This is important for interceptors which run outside React components
+    const token = useAuthStore.getState().token;
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+      console.log("Task Service Interceptor: Added auth token.");
+    } else {
+      console.log("Task Service Interceptor: No auth token found.");
+    }
+    return config;
+  },
+  (error) => {
+    console.error("Task Service Interceptor Request Error:", error);
+    return Promise.reject(error);
+  }
+);
+
+// Note: No interceptor applied to authAxiosInstance by default.
+
+// Example response interceptor for global error handling (can be applied to both instances if needed)
 // axiosInstance.interceptors.response.use(
 //   (response) => response,
 //   (error) => {

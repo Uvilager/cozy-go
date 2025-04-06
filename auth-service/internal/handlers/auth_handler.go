@@ -94,20 +94,58 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Generate JWT token
-	token, err := utils.GenerateJWT(user)
+	// Fetch full user details (including ID) after successful authentication
+	// Assuming Authenticate only validates password, we need to get the user record
+	// We might need a GetUserByEmail method in the repository
+	dbUser, err := h.repo.GetUserByEmail(r.Context(), req.Email) // Assuming this method exists
+	if err != nil {
+		log.Printf("Failed to retrieve user details after authentication for email %s: %v", req.Email, err)
+		// Handle cases like user found during auth but not found now (unlikely but possible)
+		http.Error(w, "Failed to retrieve user details", http.StatusInternalServerError)
+		return
+	}
+	if dbUser == nil {
+		// Should not happen if Authenticate passed, but good practice to check
+		log.Printf("User %s authenticated but not found in database.", req.Email)
+		http.Error(w, "User not found after authentication", http.StatusInternalServerError)
+		return
+	}
+
+
+	// Generate JWT token using the fetched user details (especially ID)
+	token, err := utils.GenerateJWT(*dbUser) // Pass the full user struct from DB
 	if err != nil {
 		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
 		return
 	}
 
-	// Emit login event to RabbitMQ
-	err = events.PublishLoginEvent(h.rabbitMQConn, user.Email)
+	// Emit login event to RabbitMQ using the authenticated user's email
+	err = events.PublishLoginEvent(h.rabbitMQConn, dbUser.Email)
 	if err != nil {
+		// Log the error but maybe don't fail the login just because event publishing failed?
+		// Depends on requirements. For now, we'll return an error.
+		log.Printf("Failed to publish login event for user %s: %v", dbUser.Email, err)
 		http.Error(w, "Failed to process login event", http.StatusInternalServerError)
 		return
 	}
 
+	// Prepare the response including token and user details
+	// Important: Exclude sensitive fields like password hash from the response user object
+	responseUser := models.UserResponse{ // Assuming a UserResponse struct exists or create one
+		ID:       dbUser.ID,
+		Username: dbUser.Username,
+		Email:    dbUser.Email,
+		// Add other safe fields as needed
+	}
+	responsePayload := map[string]interface{}{
+		"token": token,
+		"user":  responseUser,
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"token": token})
+	w.WriteHeader(http.StatusOK) // Send 200 OK
+	if err := json.NewEncoder(w).Encode(responsePayload); err != nil {
+		log.Printf("Error encoding login response for user %s: %v", dbUser.Email, err)
+	}
+	log.Printf("Successfully handled Login request for user ID: %d", dbUser.ID)
 }

@@ -20,7 +20,13 @@ import {
 } from "../ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 
-export function DropdownMenuWithAvatar() {
+interface DropdownMenuWithAvatarProps {
+  onLogout?: () => void; // Optional logout callback
+}
+
+export function DropdownMenuWithAvatar({
+  onLogout,
+}: DropdownMenuWithAvatarProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -86,8 +92,9 @@ export function DropdownMenuWithAvatar() {
           </Link>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem>
-          <LogOut />
+        {/* Add onSelect handler to trigger logout */}
+        <DropdownMenuItem onSelect={onLogout}>
+          <LogOut className="mr-2 h-4 w-4" /> {/* Added spacing */}
           Sign Out
         </DropdownMenuItem>
       </DropdownMenuContent>

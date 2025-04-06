@@ -14,6 +14,7 @@ import (
 type AuthRepository interface {
 	Authenticate(user models.User) (bool, error)
 	Register(user models.User) (int, error)
+	GetUserByEmail(ctx context.Context, email string) (*models.User, error) // Added method signature
 }
 
 type authRepository struct {
@@ -51,4 +52,31 @@ func (r *authRepository) Register(user models.User) (int, error) {
 		return 0, err
 	}
 	return userID, nil
+}
+
+// GetUserByEmail retrieves a user by their email address.
+// Returns the full User struct (including password hash).
+func (r *authRepository) GetUserByEmail(ctx context.Context, email string) (*models.User, error) {
+	query := `SELECT id, username, email, password FROM users WHERE email = $1`
+	user := &models.User{} // Pointer to hold the result
+
+	err := r.db.QueryRow(ctx, query, email).Scan(
+		&user.ID,
+		&user.Username,
+		&user.Email,
+		&user.Password, // Scan the password hash as well
+	)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			// User not found is not necessarily an application error in some contexts,
+			// but here it likely means the email provided doesn't exist.
+			return nil, nil // Return nil user and nil error to indicate not found
+		}
+		// For other errors (DB connection issues, etc.), return the error
+		return nil, err
+	}
+
+	// User found, return the user struct
+	return user, nil
 }
