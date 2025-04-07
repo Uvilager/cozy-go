@@ -7,6 +7,7 @@ services:
       - POSTGRES_USER=username
       - POSTGRES_DB=authdb
       - POSTGRES_PASSWORD=password
+      - JWT_SECRET=N4fK9z$B&E)H@McQfTjWnZr4u7x!A%D* # Added JWT Secret
     depends_on:
       - db
       - rabbitmq
@@ -28,6 +29,7 @@ services:
       - TASK_DB_PASSWORD=taskpassword
       - TASK_DB_NAME=taskdb
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/ # For later event publishing
+      - JWT_SECRET=N4fK9z$B&E)H@McQfTjWnZr4u7x!A%D* # Added JWT Secret (MUST MATCH auth-service)
     depends_on:
       - taskdb
       - rabbitmq

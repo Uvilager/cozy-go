@@ -15,9 +15,13 @@ import { queryKeys } from "@/lib/queryKeys";
  * Encapsulates the useQuery logic for fetching projects.
  */
 export const useProjects = () => {
-  return useQuery({
-    queryKey: queryKeys.projects, // Use centralized query key
-    queryFn: getProjects, // Use the API function
+  // Explicitly type the useQuery hook for better type safety
+  return useQuery<Project[], Error>({
+    // Specify return type and error type
+    queryKey: queryKeys.projects,
+    // Wrap the API call in an arrow function matching QueryFunction signature
+    // We don't pass a token here; client-side calls rely on the interceptor
+    queryFn: () => getProjects(),
     // Optional: Configure staleTime, cacheTime, etc. here or in QueryClientProvider
     // staleTime: 5 * 60 * 1000, // 5 minutes
   });
