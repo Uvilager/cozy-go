@@ -2,17 +2,19 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
-	"strconv" // Needed for parsing project ID from URL path
-
-	"errors" // For checking pgx.ErrNoRows
+	"strconv"
 
 	"cozy-go/task-service/internal/models"
+	"cozy-go/task-service/internal/utils" // Import utils package
 	"cozy-go/task-service/repository"
 
-	"github.com/jackc/pgx/v5" // Import pgx for ErrNoRows
+	"github.com/jackc/pgx/v5"
 )
+
+// Removed local helper function getUserIDFromContext
 
 // TaskHandler handles HTTP requests related to tasks.
 type TaskHandler struct {
@@ -27,32 +29,22 @@ func NewTaskHandler(repo repository.TaskRepository) *TaskHandler {
 }
 
 // CreateTask handles the POST /projects/{projectID}/tasks request.
-// Note: This assumes projectID will be extracted from the URL path by the router.
 func (h *TaskHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
-	// --- Extract projectID from URL path ---
-	// This part depends heavily on the chosen router (e.g., chi, mux).
-	// Using standard library's PathValue (Go 1.22+) as an example:
+	// Extract projectID from URL path
 	projectIDStr := r.PathValue("projectID")
 	if projectIDStr == "" {
-		// Fallback or alternative method if not using PathValue or older Go version
-		// e.g., using chi: projectIDStr := chi.URLParam(r, "projectID")
-		// e.g., using gorilla/mux: vars := mux.Vars(r); projectIDStr := vars["projectID"]
-		log.Println("Project ID not found in path") // Adjust log/error as needed
+		log.Println("Project ID not found in path")
 		http.Error(w, "Project ID missing in URL path", http.StatusBadRequest)
 		return
 	}
-
 	projectID, err := strconv.Atoi(projectIDStr)
 	if err != nil {
 		log.Printf("Invalid project ID format: %s", projectIDStr)
 		http.Error(w, "Invalid project ID format", http.StatusBadRequest)
 		return
 	}
-	// --- End of projectID extraction ---
 
 	var task models.Task
-
-	// Decode the request body
 	if err := json.NewDecoder(r.Body).Decode(&task); err != nil {
 		log.Printf("Error decoding create task request: %v", err)
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
@@ -60,72 +52,68 @@ func (h *TaskHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
-	// Basic validation
 	if task.Title == "" {
 		http.Error(w, "Task title is required", http.StatusBadRequest)
 		return
 	}
+	task.ProjectID = projectID // Assign project ID from path
 
-	// Assign the project ID from the path
-	task.ProjectID = projectID
+	// Validate enums or set defaults
+	if task.Status == "" { task.Status = models.StatusTodo }
+	if !task.Status.IsValid() { http.Error(w, "Invalid status value", http.StatusBadRequest); return }
+	if !task.Label.IsValid() { http.Error(w, "Invalid label value", http.StatusBadRequest); return } // Assuming empty is valid
+	if task.Priority == "" { task.Priority = models.PriorityMedium }
+	if !task.Priority.IsValid() { http.Error(w, "Invalid priority value", http.StatusBadRequest); return }
 
-	// TODO: Optional - Validate if projectID exists using ProjectRepository
-
-	// Validate incoming or set default values AND validate them
-	if task.Status == "" {
-		task.Status = models.StatusTodo // Or StatusBacklog? Align with desired default
-	} else if !task.Status.IsValid() {
-		log.Printf("Invalid status value provided during creation: %s", task.Status)
-		http.Error(w, "Invalid status value provided", http.StatusBadRequest)
-		return
-	}
-
-	// Decide on default label handling - leave empty or set a default
-	if task.Label == "" {
-		// task.Label = models.LabelFeature // Example: Set a default if required
-		// Assuming empty label is valid based on IsValid method
-	} else if !task.Label.IsValid() {
-		log.Printf("Invalid label value provided during creation: %s", task.Label)
-		http.Error(w, "Invalid label value provided", http.StatusBadRequest)
-		return
-	}
-
-	if task.Priority == "" {
-		task.Priority = models.PriorityMedium // Default to medium priority
-	} else if !task.Priority.IsValid() {
-		log.Printf("Invalid priority value provided during creation: %s", task.Priority)
-		http.Error(w, "Invalid priority value provided", http.StatusBadRequest)
-		return
-	}
-
-	// Now that all fields are validated (or defaulted and implicitly valid), create the task
-	createdID, err := h.repo.CreateTask(r.Context(), &task)
+	// Get UserID from context
+	userID, err := utils.GetUserIDFromContext(r)
 	if err != nil {
-		log.Printf("Error calling repository CreateTask: %v", err)
-		http.Error(w, "Failed to create task", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// Respond with the created task
+	// Call repository with userID
+	createdID, err := h.repo.CreateTask(r.Context(), &task, userID)
+	if err != nil {
+		// Check if the error is due to project ownership check failing
+		if errors.Is(err, pgx.ErrNoRows) {
+			log.Printf("Failed to create task: Project %d not found or not owned by user %d", projectID, userID)
+			http.Error(w, "Project not found or not authorized", http.StatusForbidden) // 403 Forbidden might be more appropriate
+		} else {
+			log.Printf("Error calling repository CreateTask for user %d: %v", userID, err)
+			http.Error(w, "Failed to create task", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	// Respond with the created task (fetch again to get all fields like created_at)
+	createdTask, fetchErr := h.repo.GetTaskByID(r.Context(), createdID, userID)
+	if fetchErr != nil || createdTask == nil {
+		log.Printf("Error fetching newly created task %d: %v", createdID, fetchErr)
+		// Still return 201, but maybe with a warning or just the ID
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(map[string]interface{}{"id": createdID, "message": "Task created, but failed to fetch details"})
+		return
+	}
+
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	if err := json.NewEncoder(w).Encode(task); err != nil {
+	if err := json.NewEncoder(w).Encode(createdTask); err != nil {
 		log.Printf("Error encoding create task response: %v", err)
-		// Don't return here, just log the encoding error
 	}
 	log.Printf("Successfully handled CreateTask request for task ID: %d in project ID: %d", createdID, task.ProjectID)
 }
 
 // ListTasksByProject handles the GET /projects/{projectID}/tasks request.
 func (h *TaskHandler) ListTasksByProject(w http.ResponseWriter, r *http.Request) {
-	// Extract projectID from URL path
 	projectIDStr := r.PathValue("projectID")
 	if projectIDStr == "" {
 		log.Println("Project ID not found in path for ListTasksByProject")
 		http.Error(w, "Project ID missing in URL path", http.StatusBadRequest)
 		return
 	}
-
 	projectID, err := strconv.Atoi(projectIDStr)
 	if err != nil {
 		log.Printf("Invalid project ID format in ListTasksByProject: %s", projectIDStr)
@@ -133,17 +121,22 @@ func (h *TaskHandler) ListTasksByProject(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Call the repository to get tasks
-	tasks, err := h.repo.GetTasksByProjectID(r.Context(), projectID)
+	// Get UserID from context
+	userID, err := utils.GetUserIDFromContext(r)
 	if err != nil {
-		// Note: GetTasksByProjectID doesn't return ErrNoRows specifically,
-		// an empty slice is the indicator for no tasks found.
-		log.Printf("Error calling repository GetTasksByProjectID for project %d: %v", projectID, err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Call repository with userID
+	tasks, err := h.repo.GetTasksByProjectID(r.Context(), projectID, userID)
+	if err != nil {
+		// Repo handles ErrNoRows check for ownership, returns empty slice if not owned/found
+		log.Printf("Error calling repository GetTasksByProjectID for project %d, user %d: %v", projectID, userID, err)
 		http.Error(w, "Failed to retrieve tasks", http.StatusInternalServerError)
 		return
 	}
 
-	// Respond with the list of tasks (will be an empty array [] if none found)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(tasks); err != nil {
@@ -160,7 +153,6 @@ func (h *TaskHandler) GetTask(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Task ID missing in URL path", http.StatusBadRequest)
 		return
 	}
-
 	taskID, err := strconv.Atoi(taskIDStr)
 	if err != nil {
 		log.Printf("Invalid task ID format in GetTask: %s", taskIDStr)
@@ -168,17 +160,31 @@ func (h *TaskHandler) GetTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	task, err := h.repo.GetTaskByID(r.Context(), taskID)
+	// Get UserID from context
+	userID, err := utils.GetUserIDFromContext(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Call repository with userID
+	task, err := h.repo.GetTaskByID(r.Context(), taskID, userID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			log.Printf("Task not found for ID: %d", taskID)
+			log.Printf("Task %d not found or not owned by user %d", taskID, userID)
 			http.Error(w, "Task not found", http.StatusNotFound)
 		} else {
-			log.Printf("Error calling repository GetTaskByID for task %d: %v", taskID, err)
+			log.Printf("Error calling repository GetTaskByID for task %d, user %d: %v", taskID, userID, err)
 			http.Error(w, "Failed to retrieve task", http.StatusInternalServerError)
 		}
 		return
 	}
+	// Repo returns (nil, nil) if not found/owned
+	if task == nil {
+		http.Error(w, "Task not found", http.StatusNotFound)
+		return
+	}
+
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -190,84 +196,65 @@ func (h *TaskHandler) GetTask(w http.ResponseWriter, r *http.Request) {
 
 // UpdateTask handles the PUT /projects/{projectID}/tasks/{taskID} request.
 func (h *TaskHandler) UpdateTask(w http.ResponseWriter, r *http.Request) {
-	projectIDStr := r.PathValue("projectID")
+	// Extract IDs
+	projectIDStr := r.PathValue("projectID") // Keep projectID for consistency, though repo checks ownership via task->project
 	taskIDStr := r.PathValue("taskID")
 	if projectIDStr == "" || taskIDStr == "" {
-		log.Println("Project ID or Task ID not found in path for UpdateTask")
 		http.Error(w, "Project ID or Task ID missing in URL path", http.StatusBadRequest)
 		return
 	}
-
-	projectID, err := strconv.Atoi(projectIDStr)
-	if err != nil {
-		log.Printf("Invalid project ID format in UpdateTask: %s", projectIDStr)
-		http.Error(w, "Invalid project ID format", http.StatusBadRequest)
-		return
-	}
-	taskID, err := strconv.Atoi(taskIDStr)
-	if err != nil {
-		log.Printf("Invalid task ID format in UpdateTask: %s", taskIDStr)
-		http.Error(w, "Invalid task ID format", http.StatusBadRequest)
+	projectID, errP := strconv.Atoi(projectIDStr)
+	taskID, errT := strconv.Atoi(taskIDStr)
+	if errP != nil || errT != nil {
+		http.Error(w, "Invalid project or task ID format", http.StatusBadRequest)
 		return
 	}
 
+	// Decode payload
 	var taskUpdates models.Task
 	if err := json.NewDecoder(r.Body).Decode(&taskUpdates); err != nil {
-		log.Printf("Error decoding update task request: %v", err)
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 	defer r.Body.Close()
 
-	// Basic validation
-	if taskUpdates.Title == "" {
-		http.Error(w, "Task title is required", http.StatusBadRequest)
-		return
-	}
+	// Validate payload
+	if taskUpdates.Title == "" { http.Error(w, "Task title is required", http.StatusBadRequest); return }
+	if !taskUpdates.Status.IsValid() { http.Error(w, "Invalid status value", http.StatusBadRequest); return }
+	if !taskUpdates.Label.IsValid() { http.Error(w, "Invalid label value", http.StatusBadRequest); return }
+	if !taskUpdates.Priority.IsValid() { http.Error(w, "Invalid priority value", http.StatusBadRequest); return }
 
-	// Validate incoming status, label, and priority
-	if !taskUpdates.Status.IsValid() {
-		http.Error(w, "Invalid status value provided", http.StatusBadRequest)
-		return
-	}
-	if !taskUpdates.Label.IsValid() {
-		// Assuming empty label is valid based on IsValid method, otherwise add check for empty if needed
-		http.Error(w, "Invalid label value provided", http.StatusBadRequest)
-		return
-	}
-	if !taskUpdates.Priority.IsValid() {
-		http.Error(w, "Invalid priority value provided", http.StatusBadRequest)
-		return
-	}
-
-
-	// Set IDs from path parameters
+	// Set IDs from path
 	taskUpdates.ID = taskID
-	taskUpdates.ProjectID = projectID
+	taskUpdates.ProjectID = projectID // Include projectID in the model being passed
 
-	err = h.repo.UpdateTask(r.Context(), &taskUpdates)
+	// Get UserID from context
+	userID, err := utils.GetUserIDFromContext(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Call repository with userID
+	err = h.repo.UpdateTask(r.Context(), &taskUpdates, userID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			log.Printf("Task not found for update with ID: %d in project %d", taskID, projectID)
-			http.Error(w, "Task not found", http.StatusNotFound)
+			log.Printf("Task %d not found or not owned by user %d for update", taskID, userID)
+			http.Error(w, "Task not found or not authorized", http.StatusNotFound) // 404 or 403?
 		} else {
-			log.Printf("Error calling repository UpdateTask for task %d: %v", taskID, err)
+			log.Printf("Error calling repository UpdateTask for task %d, user %d: %v", taskID, userID, err)
 			http.Error(w, "Failed to update task", http.StatusInternalServerError)
 		}
 		return
 	}
 
-	// Respond with 200 OK and the updated task (optional, could also be 204 No Content)
-	// Fetch the updated task again to ensure we return the latest state including updated_at
-	updatedTask, fetchErr := h.repo.GetTaskByID(r.Context(), taskID)
-	if fetchErr != nil {
-		log.Printf("Error fetching updated task %d after update: %v", taskID, fetchErr)
-		// Still return 200 OK as the update itself succeeded
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"message": "Task updated successfully, but failed to fetch updated details."}`))
+	// Fetch the updated task again to return it
+	updatedTask, fetchErr := h.repo.GetTaskByID(r.Context(), taskID, userID) // Pass userID
+	if fetchErr != nil || updatedTask == nil {
+		log.Printf("Error fetching updated task %d after update for user %d: %v", taskID, userID, fetchErr)
+		http.Error(w, "Task updated but failed to fetch details", http.StatusInternalServerError)
 		return
 	}
-
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -275,38 +262,42 @@ func (h *TaskHandler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Error encoding update task response: %v", err)
 	}
 	log.Printf("Successfully handled UpdateTask request for task ID: %d in project ID: %d", taskID, projectID)
-
 }
 
 // DeleteTask handles the DELETE /tasks/{taskID} request.
 func (h *TaskHandler) DeleteTask(w http.ResponseWriter, r *http.Request) {
 	taskIDStr := r.PathValue("taskID")
 	if taskIDStr == "" {
-		log.Println("Task ID not found in path for DeleteTask")
 		http.Error(w, "Task ID missing in URL path", http.StatusBadRequest)
 		return
 	}
-
 	taskID, err := strconv.Atoi(taskIDStr)
 	if err != nil {
-		log.Printf("Invalid task ID format in DeleteTask: %s", taskIDStr)
 		http.Error(w, "Invalid task ID format", http.StatusBadRequest)
 		return
 	}
 
-	err = h.repo.DeleteTask(r.Context(), taskID)
+	// Get UserID from context
+	userID, err := utils.GetUserIDFromContext(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Call repository with userID
+	err = h.repo.DeleteTask(r.Context(), taskID, userID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			log.Printf("Task not found for deletion with ID: %d", taskID)
-			http.Error(w, "Task not found", http.StatusNotFound)
+			log.Printf("Task %d not found or not owned by user %d for deletion", taskID, userID)
+			http.Error(w, "Task not found or not authorized", http.StatusNotFound) // 404 or 403?
 		} else {
-			log.Printf("Error calling repository DeleteTask for task %d: %v", taskID, err)
+			log.Printf("Error calling repository DeleteTask for task %d, user %d: %v", taskID, userID, err)
 			http.Error(w, "Failed to delete task", http.StatusInternalServerError)
 		}
 		return
 	}
 
-	w.WriteHeader(http.StatusNoContent) // 204 No Content is standard for successful DELETE
+	w.WriteHeader(http.StatusNoContent)
 	log.Printf("Successfully handled DeleteTask request for task ID: %d", taskID)
 }
 
@@ -314,50 +305,40 @@ func (h *TaskHandler) DeleteTask(w http.ResponseWriter, r *http.Request) {
 func (h *TaskHandler) UpdateTaskStatusHandler(w http.ResponseWriter, r *http.Request) {
 	taskIDStr := r.PathValue("taskID")
 	if taskIDStr == "" {
-		log.Println("Task ID not found in path for UpdateTaskStatus")
 		http.Error(w, "Task ID missing in URL path", http.StatusBadRequest)
 		return
 	}
-
 	taskID, err := strconv.Atoi(taskIDStr)
 	if err != nil {
-		log.Printf("Invalid task ID format in UpdateTaskStatus: %s", taskIDStr)
 		http.Error(w, "Invalid task ID format", http.StatusBadRequest)
 		return
 	}
 
-	// Define payload struct specifically for this handler
-	var payload struct {
-		Status models.Status `json:"status"` // Use the custom Status type
-	}
-
+	var payload struct { Status models.Status `json:"status"` }
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-		log.Printf("Error decoding update task status request: %v", err)
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 	defer r.Body.Close()
 
-	if payload.Status == "" {
-		http.Error(w, "Status is required in request body", http.StatusBadRequest)
+	if payload.Status == "" { http.Error(w, "Status is required", http.StatusBadRequest); return }
+	if !payload.Status.IsValid() { http.Error(w, "Invalid status value", http.StatusBadRequest); return }
+
+	// Get UserID from context
+	userID, err := utils.GetUserIDFromContext(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// Validate the status using the IsValid method
-	if !payload.Status.IsValid() {
-		log.Printf("Invalid status value provided for task %d: %s", taskID, payload.Status)
-		http.Error(w, "Invalid status value provided", http.StatusBadRequest)
-		return
-	}
-
-
-	err = h.repo.UpdateTaskStatus(r.Context(), taskID, payload.Status) // Pass the models.Status type
+	// Call repository with userID
+	err = h.repo.UpdateTaskStatus(r.Context(), taskID, payload.Status, userID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			log.Printf("Task not found for status update with ID: %d", taskID)
-			http.Error(w, "Task not found", http.StatusNotFound)
+			log.Printf("Task %d not found or not owned by user %d for status update", taskID, userID)
+			http.Error(w, "Task not found or not authorized", http.StatusNotFound) // 404 or 403?
 		} else {
-			log.Printf("Error calling repository UpdateTaskStatus for task %d: %v", taskID, err)
+			log.Printf("Error calling repository UpdateTaskStatus for task %d, user %d: %v", taskID, userID, err)
 			http.Error(w, "Failed to update task status", http.StatusInternalServerError)
 		}
 		return

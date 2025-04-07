@@ -9,7 +9,7 @@ type Project struct {
 	Description string    `json:"description,omitempty"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
-	// TODO: Add relation to User (Owner/Creator) if needed later
+	UserID      int       `json:"user_id"` // Added UserID field
 }
 
 // Task represents a single task within a project
