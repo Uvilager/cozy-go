@@ -31,7 +31,7 @@
 - [ edit task backend update to only use changed field on the frontend and not whole object ]
 - [ label crud. on three dots edit label. ]
 - [ on first load choose default project ]
-- [ ]
+- [ serverside cookie/ clientside js cookie ]
 - [ ]
 - [ ]
 - [ ]

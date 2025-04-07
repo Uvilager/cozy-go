@@ -23,28 +23,47 @@ export const authAxiosInstance = axios.create({
 });
 
 // --- Interceptors ---
-// Import the Zustand store
-import { useAuthStore } from "@/store/authStore";
+// Import js-cookie
+import Cookies from "js-cookie";
 
 // Request interceptor ONLY for the default instance (Task Service)
 axiosInstance.interceptors.request.use(
   (config) => {
-    // Get token from Zustand store *without* subscribing to changes
-    // This is important for interceptors which run outside React components
-    const token = useAuthStore.getState().token;
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-      console.log("Task Service Interceptor: Added auth token.");
+    // This interceptor runs for requests made using this instance.
+    // Check if running on the client-side before accessing cookies.
+    if (typeof window !== "undefined") {
+      const token = Cookies.get("authToken"); // Use the same cookie name as middleware/login hook
+      console.log(
+        "Client-side interceptor check, token:",
+        token ? "found" : "undefined"
+      );
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+        console.log(
+          "Task Service Interceptor (Client): Added auth token from cookie."
+        );
+      } else {
+        console.log(
+          "Task Service Interceptor (Client): No auth token found in cookie."
+        );
+      }
     } else {
-      console.log("Task Service Interceptor: No auth token found.");
+      // Running server-side (e.g., SSR, RSC data fetching)
+      // Cannot access document.cookie here.
+      // Auth for server-side requests must be handled differently
+      // (e.g., reading cookie from request headers and passing token explicitly).
+      console.log("Task Service Interceptor (Server): Skipping cookie check.");
     }
+    // Ensure config is always returned after the if/else block
     return config;
   },
   (error) => {
+    // This is the correct error handler for the request interceptor
     console.error("Task Service Interceptor Request Error:", error);
     return Promise.reject(error);
   }
 );
+// Removed duplicated else block, return statement, and error handler
 
 // Note: No interceptor applied to authAxiosInstance by default.
 

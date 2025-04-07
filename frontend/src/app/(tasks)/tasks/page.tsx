@@ -12,6 +12,7 @@ import { ProjectPicker } from "@/components/projects/project-picker";
 // Import Project type along with API functions
 import { Project, getProjects, getTasksByProject } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys"; // Import query keys
+import { cookies } from "next/headers"; // Import cookies function for Server Components
 
 // Removed old fetch functions and Project interface (assuming it's defined/exported elsewhere if needed)
 // API_URL is now handled within the axios instance/API layer
@@ -24,12 +25,20 @@ export default async function TasksPage({
   searchParams?: { [key: string]: string | string[] | undefined };
 }) {
   const queryClient = new QueryClient();
+  // Read the auth token from cookies on the server-side
+  // Await cookies() and then get the value
+  const cookieStore = await cookies(); // Await the cookies() function call
+  const token = cookieStore.get("authToken")?.value;
+  console.log(
+    "TasksPage (Server): Read token from cookie - ",
+    token ? "found" : "not found"
+  );
 
-  // Prefetch projects first
+  // Prefetch projects first, passing the token
   try {
     await queryClient.prefetchQuery({
       queryKey: queryKeys.projects,
-      queryFn: getProjects,
+      queryFn: () => getProjects(token), // Pass token here
     });
   } catch (error) {
     console.error("TasksPage: Failed to prefetch projects on server:", error);
@@ -61,8 +70,8 @@ export default async function TasksPage({
       await queryClient.prefetchQuery({
         // Use the centralized query key
         queryKey: queryKeys.tasks(projectIdToFetch),
-        // Use the new API function
-        queryFn: () => getTasksByProject(projectIdToFetch),
+        // Use the new API function, passing the token
+        queryFn: () => getTasksByProject(projectIdToFetch, token), // Pass token here
       });
     } catch (error) {
       console.error(
