@@ -92,9 +92,7 @@ export function ProfileForm() {
         <FormField
           control={form.control}
           name="username"
-          render={(
-            { field }: { field: any } // Add type for field
-          ) => (
+          render={({ field }) => (
             <FormItem>
               <FormLabel>Username</FormLabel>
               <FormControl>
@@ -112,7 +110,7 @@ export function ProfileForm() {
           control={form.control}
           name="email"
           render={(
-            { field }: { field: any } // Add type for field
+            { field } // Add type for field
           ) => (
             <FormItem>
               <FormLabel>Email</FormLabel>
@@ -143,7 +141,7 @@ export function ProfileForm() {
           control={form.control}
           name="bio"
           render={(
-            { field }: { field: any } // Add type for field
+            { field } // Add type for field
           ) => (
             <FormItem>
               <FormLabel>Bio</FormLabel>
@@ -174,7 +172,7 @@ export function ProfileForm() {
                 key={index} // Using index might be okay for simple cases
                 name={`urls.${index}.value`}
                 render={(
-                  { field }: { field: any } // Add type for field
+                  { field } // Add type for field
                 ) => (
                   <FormItem>
                     <FormLabel className={index !== 0 ? "sr-only" : ""}>

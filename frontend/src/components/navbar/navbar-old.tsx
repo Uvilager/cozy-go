@@ -25,6 +25,7 @@ import {
 import { ModeToggle } from "./mode-toggle";
 import Link from "next/link";
 import { DropdownMenuWithAvatar } from "./user-nav";
+import Image from "next/image";
 
 interface MenuItem {
   title: string;
@@ -146,7 +147,7 @@ const Navbar1 = ({
           <div className="flex items-center gap-6">
             {/* Logo */}
             <Link href={"/"} className="flex items-center gap-2">
-              <img src={logo.src} className="max-h-8" alt={logo.alt} />
+              <Image src={logo.src} className="max-h-8" alt={logo.alt} />
               <span className="text-lg font-semibold tracking-tighter">
                 {logo.title}
               </span>
@@ -176,7 +177,7 @@ const Navbar1 = ({
           <div className="flex items-center justify-between">
             {/* Logo */}
             <a href={logo.url} className="flex items-center gap-2">
-              <img src={logo.src} className="max-h-8" alt={logo.alt} />
+              <Image src={logo.src} className="max-h-8" alt={logo.alt} />
             </a>
             <Sheet>
               <SheetTrigger asChild>
@@ -188,7 +189,11 @@ const Navbar1 = ({
                 <SheetHeader>
                   <SheetTitle>
                     <a href={logo.url} className="flex items-center gap-2">
-                      <img src={logo.src} className="max-h-8" alt={logo.alt} />
+                      <Image
+                        src={logo.src}
+                        className="max-h-8"
+                        alt={logo.alt}
+                      />
                     </a>
                   </SheetTitle>
                 </SheetHeader>

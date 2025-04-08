@@ -10,7 +10,7 @@ import {
 import TaskTableClient from "@/components/tasks/task-table-client";
 import { ProjectPicker } from "@/components/projects/project-picker";
 // Import Project type along with API functions
-import { Project, getProjects, getTasksByProject } from "@/lib/api";
+import { getProjects, getTasksByProject } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys"; // Import query keys
 import { cookies } from "next/headers"; // Import cookies function for Server Components
 
@@ -22,8 +22,9 @@ import { cookies } from "next/headers"; // Import cookies function for Server Co
 export default async function TasksPage({
   searchParams,
 }: {
-  searchParams?: { [key: string]: string | string[] | undefined };
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
+  const resolvedSearchParams = await searchParams; // Await the Promise to get the actual searchParams object
   const queryClient = new QueryClient();
   // Read the auth token from cookies on the server-side
   // Await cookies() and then get the value
@@ -50,7 +51,9 @@ export default async function TasksPage({
 
   // Determine the projectId to use based *only* on URL search params for server prefetch.
   // The client-side ProjectPicker will handle defaulting if the param is missing/invalid.
-  const currentProjectIdParam = searchParams?.projectId as string | undefined;
+  const currentProjectIdParam = resolvedSearchParams.projectId as
+    | string
+    | undefined;
   let projectIdToFetch: number | undefined;
 
   // Try to parse the ID from the URL param. No fallback logic here on the server.

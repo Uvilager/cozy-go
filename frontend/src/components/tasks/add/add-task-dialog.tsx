@@ -9,7 +9,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -62,7 +61,8 @@ export function AddTaskDialog({ projectId, trigger }: AddTaskDialogProps) {
         <DialogHeader>
           <DialogTitle>Add New Task</DialogTitle>
           <DialogDescription>
-            Fill in the details for the new task. Click add when you're done.
+            Fill in the details for the new task. Click add when you&apos;re
+            done.
           </DialogDescription>
         </DialogHeader>
         <AddTaskForm

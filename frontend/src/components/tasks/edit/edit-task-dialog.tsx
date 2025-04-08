@@ -9,7 +9,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
   // DialogTrigger, // Trigger will be handled manually in row actions
@@ -55,7 +54,7 @@ export function EditTaskDialog({
   const { mutate: updateTaskMutate, isPending: isSubmitting } = useUpdateTask(
     task?.project_id, // Pass projectId for invalidation
     {
-      onSuccess: (updatedTask) => {
+      onSuccess: () => {
         // Toast is handled by hook
         onOpenChange(false); // Close dialog on success
       },
@@ -86,7 +85,7 @@ export function EditTaskDialog({
         <DialogHeader>
           <DialogTitle>Edit Task (ID: {task.id})</DialogTitle>
           <DialogDescription>
-            Make changes to the task details. Click save when you're done.
+            Make changes to the task details. Click save when you&apos;re done.
           </DialogDescription>
         </DialogHeader>
         {/* Pass defaultValues derived from the task prop */}

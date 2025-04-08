@@ -49,12 +49,21 @@ export const login = async (
 
     console.log("API: Login successful for:", response.data.user.email);
     return response.data;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("API Error logging in:", error);
-    // Re-throw a more specific error message if possible
-    const errorMessage =
-      error.response?.data?.message || error.message || "Login failed";
-    throw new Error(errorMessage);
+
+    // Type guard to check if error is an AxiosError
+    if (error instanceof Error && "response" in error) {
+      const axiosError = error as {
+        response?: { data?: { message?: string } };
+      };
+      const errorMessage =
+        axiosError.response?.data?.message || error.message || "Login failed";
+      throw new Error(errorMessage);
+    }
+
+    // Fallback for unknown error types
+    throw new Error("An unknown error occurred during login.");
   }
 };
 
@@ -96,11 +105,23 @@ export const register = async (
 
     console.log("API: Registration successful:", response.data.message);
     return response.data; // Return { message: "..." }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("API Error registering:", error);
-    const errorMessage =
-      error.response?.data?.message || error.message || "Registration failed";
-    throw new Error(errorMessage);
+
+    // Type guard to check if error is an AxiosError
+    if (error instanceof Error && "response" in error) {
+      const axiosError = error as {
+        response?: { data?: { message?: string } };
+      };
+      const errorMessage =
+        axiosError.response?.data?.message ||
+        error.message ||
+        "Registration failed";
+      throw new Error(errorMessage);
+    }
+
+    // Fallback for unknown error types
+    throw new Error("An unknown error occurred during registration.");
   }
 };
 

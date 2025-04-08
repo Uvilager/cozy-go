@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"; // Consolidate imports
 import {
-  getProjects,
   getTasksByProject,
   createTask,
   CreateTaskPayload,

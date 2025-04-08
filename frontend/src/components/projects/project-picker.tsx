@@ -1,9 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useQueryClient } from "@tanstack/react-query"; // Import useQueryClient
 // Import useMutation if/when create project functionality is added
 // import { useMutation } from "@tanstack/react-query";
 
@@ -36,7 +35,6 @@ import { useProjects } from "@/hooks/useProjects";
 import { Project } from "@/lib/api"; // Assuming Project type is here
 // Import createProject API function when available
 // import { createProject } from "@/lib/api";
-import { queryKeys } from "@/lib/queryKeys";
 import { AddProjectDialog } from "./add/add-project-dialog"; // Import the new dialog component
 import { EditProjectDialog } from "./edit/edit-project-dialog"; // Import Edit Dialog
 import { DeleteProjectDialog } from "./delete/delete-project-dialog"; // Import Delete Dialog
@@ -54,7 +52,6 @@ interface ProjectPickerProps {
 export function ProjectPicker({ currentProjectId }: ProjectPickerProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const queryClient = useQueryClient(); // Get query client instance
 
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -67,7 +64,7 @@ export function ProjectPicker({ currentProjectId }: ProjectPickerProps) {
 
   // Fetch projects using the hook
   const { data: projectsData, isLoading, isError, error } = useProjects();
-  const projects = projectsData ?? [];
+  const projects = useMemo(() => projectsData ?? [], [projectsData]);
 
   // --- TODO: Implement Project Creation Mutation ---
   // const createProjectMutation = useMutation({

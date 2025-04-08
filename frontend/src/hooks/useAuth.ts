@@ -45,7 +45,7 @@ export const useLogin = () => {
  * Note: Does not log the user in automatically based on current API design.
  */
 export const useRegister = () => {
-  const router = useRouter();
+  // const router = useRouter();
 
   return useMutation<{ message: string }, Error, RegisterPayload>({
     mutationFn: register, // The API function to call for registration

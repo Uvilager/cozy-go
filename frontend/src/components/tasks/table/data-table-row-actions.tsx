@@ -49,7 +49,7 @@ export function DataTableRowActions<TData>({
         setIsDeleteDialogOpen(false); // Close dialog on success
         // Toast notification is handled within the hook
       },
-      onError: (error) => {
+      onError: () => {
         // Toast notification is handled within the hook
         // Optionally keep dialog open on error? For now, let's close it.
         setIsDeleteDialogOpen(false);

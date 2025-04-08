@@ -34,15 +34,15 @@ services:
       - taskdb
       - rabbitmq
 
-  # frontend:
-  #   build: ./frontend
-  #   ports:
-  #     - "3000:3000"
-  #   environment:
-  #     # This tells the Next.js app (running in the browser) where the backend API is accessible
-  #     - NEXT_PUBLIC_API_URL=http://localhost:8080
-  #   depends_on:
-  #     - auth-service # Ensure auth service starts first
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    environment:
+      # This tells the Next.js app (running in the browser) where the backend API is accessible
+      - NEXT_PUBLIC_API_URL=http://localhost:8080
+    depends_on:
+      - auth-service # Ensure auth service starts first
 
   db:
     image: postgres:latest

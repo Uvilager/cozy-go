@@ -2,7 +2,6 @@ import {
   BadgeCheckIcon,
   BellIcon,
   ChevronsUpDownIcon,
-  CreditCardIcon,
   LogOut,
   SettingsIcon,
   SparklesIcon,
