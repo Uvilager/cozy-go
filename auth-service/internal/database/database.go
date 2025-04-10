@@ -14,22 +14,33 @@ import (
 var DB *pgxpool.Pool
 
 // InitDB initializes the database connection pool.
-func InitDB() error {
-	dbHost := os.Getenv("TASK_DB_HOST")
-	dbPort := os.Getenv("TASK_DB_PORT")
-	dbUser := os.Getenv("TASK_DB_USER")
-	dbPassword := os.Getenv("TASK_DB_PASSWORD")
-	dbName := os.Getenv("TASK_DB_NAME")
+func InitDB() (*pgxpool.Pool, error) {
+	var connString string
 
-	// Construct the connection string
-	// Example: "postgres://taskuser:taskpassword@taskdb:5432/taskdb?sslmode=require"
-	connString := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", // Changed sslmode to require for Azure PG
-		dbUser, dbPassword, dbHost, dbPort, dbName)
+	// Try DATABASE_URL first (set by Terraform for Azure)
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL != "" {
+		log.Println("Using DATABASE_URL environment variable (expected in Azure).")
+		connString = databaseURL // Assume it includes sslmode=require from Terraform
+	} else {
+		// Fallback to individual variables (for local/docker-compose)
+		log.Println("DATABASE_URL not set, using individual POSTGRES_* variables (expected locally).")
+		dbHost := os.Getenv("POSTGRES_HOST")
+		dbPort := os.Getenv("POSTGRES_PORT")
+		dbUser := os.Getenv("POSTGRES_USER")
+		dbPassword := os.Getenv("POSTGRES_PASSWORD")
+		dbName := os.Getenv("POSTGRES_DB")
+
+		// Construct the connection string, ensuring sslmode=require for consistency or Azure needs
+		// If local PG doesn't use SSL, adjust "?sslmode=require" to "?sslmode=disable" or remove it.
+		connString = fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
+			dbUser, dbPassword, dbHost, dbPort, dbName)
+	}
 
 	// Configure the connection pool
 	config, err := pgxpool.ParseConfig(connString)
 	if err != nil {
-		return fmt.Errorf("failed to parse database config: %w", err)
+		return nil, fmt.Errorf("failed to parse database config: %w", err)
 	}
 
 	// Optional: Configure pool settings
@@ -53,7 +64,7 @@ func InitDB() error {
 			if err == nil {
 				log.Println("Database connection successful!")
 				DB = pool // Assign the successful pool to the global variable
-				return nil
+				return DB, nil
 			}
 			log.Printf("Database ping failed: %v. Retrying...", err)
 			pool.Close() // Close the pool if ping failed
@@ -67,7 +78,7 @@ func InitDB() error {
 	}
 
 	// If all retries fail
-	return fmt.Errorf("failed to connect to database after %d attempts: %w", maxRetries, err)
+	return nil, fmt.Errorf("failed to connect to database after %d attempts: %w", maxRetries, err)
 }
 
 // CloseDB closes the database connection pool.

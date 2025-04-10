@@ -9,14 +9,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"auth-service/internal/handlers"
 	"auth-service/internal/models"
 	"auth-service/repository"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -36,34 +34,15 @@ func setupTestDB() *pgxpool.Pool {
 	return dbpool
 }
 
-func setupRabbitMQ() (*amqp.Connection, error) {
-	var conn *amqp.Connection
-	var err error
-	for i := 0; i < 5; i++ {
-		log.Print("Attempting to connect to RabbitMQ...")
-		conn, err = amqp.Dial("amqp://guest:guest@localhost:5672/")
-		if err == nil {
-			break
-		}
-		log.Printf("Failed to connect to RabbitMQ (attempt %d/5): %v", i+1, err)
-		time.Sleep(3 * time.Second)
-	}
-	if err != nil {
-		return nil, err
-	}
-	return conn, nil
-}
+// setupRabbitMQ removed as we are switching to Service Bus and mocking/nil is preferred for unit tests
 
 func TestRegisterHandler(t *testing.T) {
 	db := setupTestDB()
-	rabbitMQConn, err := setupRabbitMQ()
-	if err != nil {
-		t.Fatalf("Failed to connect to RabbitMQ: %v", err)
-	}
-	defer rabbitMQConn.Close()
+	// rabbitMQConn setup removed
 
 	repo := repository.NewAuthRepository(db)
-	handler := handlers.NewAuthHandler(repo, rabbitMQConn)
+	// Pass nil for the sender in unit tests
+	handler := handlers.NewAuthHandler(repo, nil)
 
 	user := models.User{
 		Username: "newuser",
@@ -86,14 +65,11 @@ func TestRegisterHandler(t *testing.T) {
 
 func TestLoginHandler(t *testing.T) {
 	db := setupTestDB()
-	rabbitMQConn, err := setupRabbitMQ()
-	if err != nil {
-		t.Fatalf("Failed to connect to RabbitMQ: %v", err)
-	}
-	defer rabbitMQConn.Close()
+	// rabbitMQConn setup removed
 
 	repo := repository.NewAuthRepository(db)
-	handler := handlers.NewAuthHandler(repo, rabbitMQConn)
+	// Pass nil for the sender in unit tests
+	handler := handlers.NewAuthHandler(repo, nil)
 
 	user := models.User{
 		Username: "newuser",

@@ -1,0 +1,5 @@
+# Exclude google-calendar and google-calendar-clone
+google-calendar/
+google-calendar-clone/
+.env
+terraform

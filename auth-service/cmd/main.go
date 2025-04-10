@@ -4,10 +4,8 @@ import (
 	"context"
 	"log"
 	"net/http"
-	"os"
 
-	"github.com/jackc/pgx/v5/pgxpool"
-
+	"auth-service/internal/database"
 	"auth-service/internal/events"
 	"auth-service/internal/handlers"
 	"auth-service/internal/routes"
@@ -17,29 +15,31 @@ import (
 )
 
 func main() {
-	// Connect to RabbitMQ
-	conn, err := events.SetupRabbitMQ()
+	log.Println("Auth Service Starting...") // Add initial log message
+
+	// Setup Azure Service Bus
+	// Use context.Background() for setup, consider more specific contexts if needed
+	sbClient, err := events.SetupServiceBus(context.Background())
 	if err != nil {
-		log.Fatalf("Failed to connect to RabbitMQ: %v", err)
+		log.Fatalf("Failed to setup Azure Service Bus: %v", err)
 	}
-	defer conn.Close()
+	// Defer closing the client and sender
+	defer sbClient.Close(context.Background()) // Use background context for cleanup
 
 	// Initialize database connection
-	log.Println("Attempting to connect to Postgres...")
-	connStr := "postgres://" + os.Getenv("POSTGRES_USER") + ":" + os.Getenv("POSTGRES_PASSWORD") +
-		"@db:5432/" + os.Getenv("POSTGRES_DB") + "?sslmode=disable"
-	dbpool, err := pgxpool.New(context.Background(), connStr)
+	dbpool, err := database.InitDB(); 
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
-	}
-	defer dbpool.Close()
+        log.Fatalf("Failed to initialize database: %v", err)
+    }
+    defer database.CloseDB()
 
 	// Initialize repositories
 	authRepo := repository.NewAuthRepository(dbpool)
 	healthRepo := repository.NewHealthRepository(dbpool)
 
 	// Initialize HTTP handlers
-	authHandler := handlers.NewAuthHandler(authRepo, conn)
+	// Pass the Service Bus Sender to the AuthHandler
+	authHandler := handlers.NewAuthHandler(authRepo, sbClient.Sender)
 	healthHandler := handlers.NewHealthHandler(healthRepo)
 	protectedHandler := handlers.NewProtectedHandler()
 
@@ -48,8 +48,12 @@ func main() {
 	routes.RegisterRoutes(mux, authHandler, healthHandler, protectedHandler)
 
 	// Configure CORS
+	// TODO: Consider using an environment variable for allowed origins in production
+	allowedOrigins := []string{"*"}
+	log.Printf("Configuring CORS for origins: %v", allowedOrigins)
+
 	c := cors.New(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:3000"},
+		AllowedOrigins:   allowedOrigins,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Content-Type", "Authorization"},
 		AllowCredentials: true,

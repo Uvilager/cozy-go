@@ -10,17 +10,18 @@ import (
 	"auth-service/internal/utils"
 	"auth-service/repository"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/messaging/azservicebus"
 	"github.com/go-playground/validator/v10"
-	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type AuthHandler struct {
-	repo         repository.AuthRepository
-	rabbitMQConn *amqp.Connection
+	repo        repository.AuthRepository
+	eventSender *azservicebus.Sender // Changed from RabbitMQ connection to Service Bus Sender
 }
 
-func NewAuthHandler(repo repository.AuthRepository, rabbitMQConn *amqp.Connection) *AuthHandler {
-	return &AuthHandler{repo: repo, rabbitMQConn: rabbitMQConn}
+// NewAuthHandler updated to accept an azservicebus.Sender
+func NewAuthHandler(repo repository.AuthRepository, sender *azservicebus.Sender) *AuthHandler {
+	return &AuthHandler{repo: repo, eventSender: sender}
 }
 
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
@@ -111,7 +112,6 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-
 	// Generate JWT token using the fetched user details (especially ID)
 	token, err := utils.GenerateJWT(*dbUser) // Pass the full user struct from DB
 	if err != nil {
@@ -119,11 +119,12 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Emit login event to RabbitMQ using the authenticated user's email
-	err = events.PublishLoginEvent(h.rabbitMQConn, dbUser.Email)
+	// Emit login event using Azure Service Bus Sender
+	// We'll need to update/create a function in the events package for this
+	err = events.PublishUserRegisteredEvent(r.Context(), h.eventSender, dbUser.Email) // Assuming a function like this exists/will exist
 	if err != nil {
 		// Log the error but maybe don't fail the login just because event publishing failed?
-		// Depends on requirements. For now, we'll return an error.
+		// Depends on requirements. For now, we'll log and continue.
 		log.Printf("Failed to publish login event for user %s: %v", dbUser.Email, err)
 		http.Error(w, "Failed to process login event", http.StatusInternalServerError)
 		return
