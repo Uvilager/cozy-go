@@ -10,18 +10,18 @@ import (
 	"auth-service/internal/utils"
 	"auth-service/repository"
 
-	"github.com/Azure/azure-sdk-for-go/sdk/messaging/azservicebus"
+	// "github.com/Azure/azure-sdk-for-go/sdk/messaging/azservicebus" // No longer needed directly
 	"github.com/go-playground/validator/v10"
 )
 
 type AuthHandler struct {
-	repo        repository.AuthRepository
-	eventSender *azservicebus.Sender // Changed from RabbitMQ connection to Service Bus Sender
+	repo           repository.AuthRepository
+	eventPublisher events.EventPublisher // Use the EventPublisher interface
 }
 
-// NewAuthHandler updated to accept an azservicebus.Sender
-func NewAuthHandler(repo repository.AuthRepository, sender *azservicebus.Sender) *AuthHandler {
-	return &AuthHandler{repo: repo, eventSender: sender}
+// NewAuthHandler updated to accept an events.EventPublisher
+func NewAuthHandler(repo repository.AuthRepository, publisher events.EventPublisher) *AuthHandler {
+	return &AuthHandler{repo: repo, eventPublisher: publisher}
 }
 
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
@@ -63,6 +63,18 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Publish event after successful registration
+	if h.eventPublisher != nil { // Check if publisher is configured
+		err = h.eventPublisher.PublishUserRegisteredEvent(r.Context(), user.Email)
+		if err != nil {
+			// Log the error but don't fail the registration request
+			log.Printf("Warning: Failed to publish user registered event for email %s: %v", user.Email, err)
+			// Decide if this should be a hard failure or just a warning
+		}
+	} else {
+		log.Println("Warning: Event publisher not configured in handler, skipping event publication for registration.")
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]string{"message": "User registered successfully"}) // Send a success message
@@ -96,47 +108,46 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fetch full user details (including ID) after successful authentication
-	// Assuming Authenticate only validates password, we need to get the user record
-	// We might need a GetUserByEmail method in the repository
-	dbUser, err := h.repo.GetUserByEmail(r.Context(), req.Email) // Assuming this method exists
+	dbUser, err := h.repo.GetUserByEmail(r.Context(), req.Email)
 	if err != nil {
 		log.Printf("Failed to retrieve user details after authentication for email %s: %v", req.Email, err)
-		// Handle cases like user found during auth but not found now (unlikely but possible)
 		http.Error(w, "Failed to retrieve user details", http.StatusInternalServerError)
 		return
 	}
 	if dbUser == nil {
-		// Should not happen if Authenticate passed, but good practice to check
 		log.Printf("User %s authenticated but not found in database.", req.Email)
 		http.Error(w, "User not found after authentication", http.StatusInternalServerError)
 		return
 	}
 
 	// Generate JWT token using the fetched user details (especially ID)
-	token, err := utils.GenerateJWT(*dbUser) // Pass the full user struct from DB
+	token, err := utils.GenerateJWT(*dbUser)
 	if err != nil {
 		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
 		return
 	}
 
-	// Emit login event using Azure Service Bus Sender
-	// We'll need to update/create a function in the events package for this
-	err = events.PublishUserRegisteredEvent(r.Context(), h.eventSender, dbUser.Email) // Assuming a function like this exists/will exist
-	if err != nil {
-		// Log the error but maybe don't fail the login just because event publishing failed?
-		// Depends on requirements. For now, we'll log and continue.
-		log.Printf("Failed to publish login event for user %s: %v", dbUser.Email, err)
-		http.Error(w, "Failed to process login event", http.StatusInternalServerError)
-		return
+	// Emit login event using the EventPublisher interface
+	if h.eventPublisher != nil { // Check if publisher is configured
+		// TODO: Consider creating a specific PublishUserLoggedInEvent method/event type
+		err = h.eventPublisher.PublishUserRegisteredEvent(r.Context(), dbUser.Email) // Using the interface method
+		if err != nil {
+			// Log the error but maybe don't fail the login just because event publishing failed?
+			// Depends on requirements. For now, we'll log and continue.
+			log.Printf("Failed to publish login event for user %s: %v", dbUser.Email, err)
+			// Optionally return error if event publishing is critical
+			// http.Error(w, "Failed to process login event", http.StatusInternalServerError)
+			// return
+		} // <<< Ensure this closing brace is present
+	} else {
+		log.Println("Warning: Event publisher not configured in handler, skipping event publication for login.")
 	}
 
 	// Prepare the response including token and user details
-	// Important: Exclude sensitive fields like password hash from the response user object
-	responseUser := models.UserResponse{ // Assuming a UserResponse struct exists or create one
+	responseUser := models.UserResponse{
 		ID:       dbUser.ID,
 		Username: dbUser.Username,
 		Email:    dbUser.Email,
-		// Add other safe fields as needed
 	}
 	responsePayload := map[string]interface{}{
 		"token": token,
@@ -144,7 +155,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK) // Send 200 OK
+	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(responsePayload); err != nil {
 		log.Printf("Error encoding login response for user %s: %v", dbUser.Email, err)
 	}

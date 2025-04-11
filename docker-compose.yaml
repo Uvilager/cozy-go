@@ -10,7 +10,8 @@ services:
       - POSTGRES_PORT=5432
       - POSTGRES_HOST=db
       - JWT_SECRET=N4fK9z$B&E)H@McQfTjWnZr4u7x!A%D* # Added JWT Secret
-      - SERVICEBUS_CONNECTION_STRING=${SERVICEBUS_CONNECTION_STRING} # Azure Service Bus connection string
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/ # Added for local RabbitMQ
+      # - SERVICEBUS_CONNECTION_STRING=${SERVICEBUS_CONNECTION_STRING} # Removed for local dev, use RABBITMQ_URL instead
     depends_on:
       - db
       - rabbitmq

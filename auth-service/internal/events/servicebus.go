@@ -2,6 +2,7 @@ package events
 
 import (
 	"context"
+	"encoding/json" // Added for publisher marshalling
 	"fmt"
 	"log"
 	"os"
@@ -54,8 +55,6 @@ func SetupServiceBus(ctx context.Context) (*ServiceBusClient, error) {
 	}
 
 	// Create a sender for the specific queue
-	// No explicit retry here, assuming client connection implies namespace is reachable.
-	// Errors during sending will be handled later.
 	log.Printf("Creating sender for queue: %s", queueName)
 	sender, err := client.NewSender(queueName, nil)
 	if err != nil {
@@ -85,4 +84,63 @@ func (sb *ServiceBusClient) Close(ctx context.Context) {
 			log.Printf("Error closing Service Bus client: %v", err)
 		}
 	}
+}
+
+// --- Service Bus Publisher Implementation ---
+
+// serviceBusPublisher implements EventPublisher using Azure Service Bus.
+type serviceBusPublisher struct {
+	sender *azservicebus.Sender
+}
+
+// NewServiceBusPublisher creates a new publisher that uses Azure Service Bus.
+// It now takes the ServiceBusClient which contains the sender.
+func NewServiceBusPublisher(client *ServiceBusClient) EventPublisher {
+	if client == nil || client.Sender == nil {
+		log.Println("Warning: Service Bus client or sender provided to NewServiceBusPublisher is nil.")
+		return nil // Or perhaps return a no-op publisher implementation?
+	}
+	return &serviceBusPublisher{sender: client.Sender}
+}
+
+// PublishUserRegisteredEvent sends a message to the Azure Service Bus queue.
+// This is now a method on the serviceBusPublisher struct.
+func (p *serviceBusPublisher) PublishUserRegisteredEvent(ctx context.Context, userEmail string) error {
+	if p == nil || p.sender == nil {
+		log.Println("Error: serviceBusPublisher or its sender is nil, cannot publish event.")
+		return nil // Match previous behavior
+	}
+
+	// Assumes UserRegisteredEvent struct is defined elsewhere (e.g., publisher.go)
+	event := UserRegisteredEvent{
+		Email: userEmail,
+	}
+
+	messageBody, err := json.Marshal(event)
+	if err != nil {
+		log.Printf("Error marshalling UserRegisteredEvent for email %s: %v", userEmail, err)
+		return fmt.Errorf("failed to marshal event data: %w", err)
+	}
+
+	message := &azservicebus.Message{
+		Body:        messageBody,
+		ContentType: Ptr("application/json"), // Assumes Ptr helper is defined elsewhere
+	}
+
+	log.Printf("Publishing UserRegisteredEvent via Service Bus for email: %s", userEmail)
+
+	err = p.sender.SendMessage(ctx, message, nil)
+	if err != nil {
+		log.Printf("Error sending message to Service Bus for email %s: %v", userEmail, err)
+		return fmt.Errorf("failed to send message to service bus: %w", err)
+	}
+
+	log.Printf("Successfully published UserRegisteredEvent via Service Bus for email: %s", userEmail)
+	return nil
+}
+
+// Ptr is a helper function to get a pointer to a string.
+// NOTE: Moved this here temporarily, might belong in a shared utils package or publisher.go
+func Ptr(s string) *string {
+	return &s
 }
