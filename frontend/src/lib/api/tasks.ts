@@ -8,6 +8,9 @@ export interface CreateTaskPayload {
   priority?: string;
   label?: string;
   description?: string;
+  due_date?: string | null; // ISO string or null
+  start_time?: string | null; // ISO string or null
+  end_time?: string | null; // ISO string or null
 }
 
 // Define the type for the data needed to update a task
@@ -81,8 +84,11 @@ export const createTask = async (
   try {
     console.log(`API: Creating task for project ${projectId}...`, taskData);
     const payload: Partial<CreateTaskPayload> = { ...taskData };
+    // Remove empty optional fields from payload before sending
     if (payload.description === "") delete payload.description;
     if (payload.label === "") delete payload.label;
+    if (payload.priority === "") delete payload.priority; // Assuming empty means not set
+    // Null values for dates/times should be preserved if explicitly set to null
 
     const response = await axiosInstance.post<Task>(
       `/projects/${projectId}/tasks`,

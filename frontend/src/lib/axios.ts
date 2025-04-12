@@ -65,7 +65,27 @@ axiosInstance.interceptors.request.use(
 );
 // Removed duplicated else block, return statement, and error handler
 
-// Note: No interceptor applied to authAxiosInstance by default.
+// Request interceptor for the Auth Service instance
+authAxiosInstance.interceptors.request.use(
+  (config) => {
+    if (typeof window !== "undefined") {
+      const token = Cookies.get("authToken");
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+        console.log("Auth Service Interceptor (Client): Added auth token.");
+      } else {
+        console.log("Auth Service Interceptor (Client): No auth token found.");
+      }
+    } else {
+      console.log("Auth Service Interceptor (Server): Skipping cookie check.");
+    }
+    return config;
+  },
+  (error) => {
+    console.error("Auth Service Interceptor Request Error:", error);
+    return Promise.reject(error);
+  }
+);
 
 // Example response interceptor for global error handling (can be applied to both instances if needed)
 // axiosInstance.interceptors.response.use(

@@ -68,8 +68,8 @@ func (r *pgTaskRepository) CreateTask(ctx context.Context, task *models.Task, us
 	}
 
 	// 2. Proceed with task insertion if ownership is verified
-	query := `INSERT INTO tasks (project_id, title, description, status, label, priority, due_date, created_at, updated_at)
-              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+	query := `INSERT INTO tasks (project_id, title, description, status, label, priority, due_date, start_time, end_time, created_at, updated_at)
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
               RETURNING id, created_at, updated_at`
 	now := time.Now()
 	// Ensure default values if empty
@@ -84,8 +84,14 @@ func (r *pgTaskRepository) CreateTask(ctx context.Context, task *models.Task, us
 		task.Priority = models.PriorityMedium // Default to medium priority
 	}
 
+	// Remove the duplicated line below
+	// err := r.db.QueryRow(ctx, query,
+	// 	task.ProjectID, task.Title, task.Description, string(task.Status), string(task.Label), string(task.Priority), task.DueDate, now, now,
+	// 	task.Priority = models.PriorityMedium // Default to medium priority
+	// }
+
 	err := r.db.QueryRow(ctx, query,
-		task.ProjectID, task.Title, task.Description, string(task.Status), string(task.Label), string(task.Priority), task.DueDate, now, now,
+		task.ProjectID, task.Title, task.Description, string(task.Status), string(task.Label), string(task.Priority), task.DueDate, task.StartTime, task.EndTime, now, now,
 	).Scan(&task.ID, &task.CreatedAt, &task.UpdatedAt)
 	if err != nil {
 		log.Printf("Error creating task for project %d, user %d: %v", task.ProjectID, userID, err)
@@ -189,12 +195,12 @@ func (r *pgTaskRepository) UpdateTask(ctx context.Context, task *models.Task, us
 
 	// 2. Proceed with update if ownership is verified
 	query := `UPDATE tasks
-              SET title = $1, description = $2, status = $3, label = $4, priority = $5, due_date = $6, updated_at = $7
-              WHERE id = $8` // Only need task ID here, ownership checked via project
+              SET title = $1, description = $2, status = $3, label = $4, priority = $5, due_date = $6, start_time = $7, end_time = $8, updated_at = $9
+              WHERE id = $10` // Only need task ID here, ownership checked via project
 	now := time.Now()
 	commandTag, err := r.db.Exec(ctx, query,
-		task.Title, task.Description, string(task.Status), string(task.Label), string(task.Priority), task.DueDate, now,
-		task.ID, // Only task ID needed for WHERE clause now
+		task.Title, task.Description, string(task.Status), string(task.Label), string(task.Priority), task.DueDate, task.StartTime, task.EndTime, now,
+		task.ID,
 	)
 	if err != nil {
 		log.Printf("Error updating task ID %d for user %d: %v", task.ID, userID, err)

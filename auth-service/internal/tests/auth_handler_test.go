@@ -36,6 +36,14 @@ func (m *MockAuthRepository) Register(user models.User) (int, error) {
 	return args.Int(0), args.Error(1)
 }
 
+func (m *MockAuthRepository) GetUserByID(ctx context.Context, id int) (*models.User, error) {
+	args := m.Called(ctx, id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.User), args.Error(1)
+}
+
 func (m *MockAuthRepository) GetUserByEmail(ctx context.Context, email string) (*models.User, error) {
 	args := m.Called(ctx, email)
 	// Handle potential nil return for user

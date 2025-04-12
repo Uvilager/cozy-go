@@ -2,10 +2,11 @@
 
 import React from "react";
 import { format } from "date-fns";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus } from "lucide-react"; // Add Plus here
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react"; // Import Plus icon
+// import { Plus } from "lucide-react"; // Remove duplicate
 import { cn } from "@/lib/utils"; // For conditional button styling
+import AddEventDialog from "./add/add-event-dialog"; // Import the dialog
 
 export type CalendarView = "month" | "week" | "day";
 
@@ -82,11 +83,13 @@ export default function CalendarHeader({
         >
           Month
         </Button>
-        <Button size="sm" className="ml-4">
-          <Plus className="mr-1 h-4 w-4" />
-          Create Task
-          {/* Add onClick handler later */}
-        </Button>
+        {/* Wrap the Create button with the Dialog */}
+        <AddEventDialog>
+          <Button size="sm" className="ml-4">
+            <Plus className="mr-1 h-4 w-4" />
+            Create Event
+          </Button>
+        </AddEventDialog>
         {/* Placeholder for other items */}
       </div>
     </header>

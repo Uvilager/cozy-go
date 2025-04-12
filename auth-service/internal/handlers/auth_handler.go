@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strconv" // Import strconv
 
 	"auth-service/internal/events"
+	"auth-service/internal/middleware" // Import middleware
 	"auth-service/internal/models"
 	"auth-service/internal/utils"
 	"auth-service/repository"
@@ -160,4 +162,46 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Error encoding login response for user %s: %v", dbUser.Email, err)
 	}
 	log.Printf("Successfully handled Login request for user ID: %d", dbUser.ID)
+}
+
+// GetMe handles requests to fetch the current user's details based on JWT.
+func (h *AuthHandler) GetMe(w http.ResponseWriter, r *http.Request) {
+	// Extract userID string from context (set by JWTAuth middleware)
+	userIDStr, ok := r.Context().Value(middleware.UserIDContextKey).(string)
+	if !ok || userIDStr == "" {
+		log.Println("Error: User ID string not found in context or is empty")
+		http.Error(w, "Unauthorized: User ID missing from token context", http.StatusUnauthorized)
+		return
+	}
+
+	// Convert userID string to int
+	userID, err := strconv.Atoi(userIDStr)
+	if err != nil {
+		log.Printf("Error converting userID string '%s' to int: %v", userIDStr, err)
+		http.Error(w, "Unauthorized: Invalid user ID format in token", http.StatusUnauthorized)
+		return
+	}
+
+	// Fetch user details from repository using the ID
+	user, err := h.repo.GetUserByID(r.Context(), userID)
+	if err != nil {
+		log.Printf("Error fetching user details for ID %d: %v", userID, err)
+		http.Error(w, "Failed to retrieve user information", http.StatusInternalServerError)
+		return
+	}
+	if user == nil {
+		// This case should ideally not happen if the token was valid,
+		// but handle it defensively (e.g., user deleted after token issued).
+		log.Printf("User with ID %d from token not found in database", userID)
+		http.Error(w, "Unauthorized: User not found", http.StatusUnauthorized)
+		return
+	}
+
+	// Respond with user details (excluding password)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(w).Encode(user); err != nil {
+		log.Printf("Error encoding GetMe response for user ID %d: %v", userID, err)
+	}
+	log.Printf("Successfully handled GetMe request for user ID: %d", userID)
 }

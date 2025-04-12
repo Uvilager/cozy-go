@@ -17,7 +17,8 @@ export interface RegisterPayload {
 export interface User {
   id: number; // Or string, depending on your backend
   email: string;
-  // Add other relevant user fields (name, roles, etc.)
+  username?: string; // Add optional username field
+  // Add other relevant user fields (roles, etc.)
 }
 
 // Define the expected response structure after successful login/registration
@@ -122,6 +123,51 @@ export const register = async (
 
     // Fallback for unknown error types
     throw new Error("An unknown error occurred during registration.");
+  }
+};
+
+/**
+ * Fetches the current logged-in user's details.
+ * Relies on the auth token being sent automatically by the axios instance (client-side)
+ * or being passed explicitly (server-side).
+ * @param token Optional token for server-side requests.
+ * @returns A promise that resolves to the User object.
+ */
+export const getMe = async (token?: string): Promise<User> => {
+  const headers: Record<string, string> = {};
+  if (token) {
+    console.log("API: getMe called with explicit token (server-side).");
+    headers["Authorization"] = `Bearer ${token}`;
+  } else {
+    console.log(
+      "API: getMe called without explicit token (client-side, relying on interceptor)."
+    );
+    // On client-side, interceptor should add the token
+  }
+
+  try {
+    console.log("API: Fetching current user (/me)...");
+    // Use GET request to the new /me endpoint with potential headers
+    const response = await authAxiosInstance.get<User>("/me", { headers });
+
+    if (response.status !== 200) {
+      throw new Error(`Failed to fetch user: Status ${response.status}`);
+    }
+    // Basic validation
+    if (
+      !response.data ||
+      typeof response.data.id !== "number" ||
+      typeof response.data.email !== "string"
+    ) {
+      throw new Error("Invalid response structure from /me API");
+    }
+
+    console.log("API: /me fetch successful:", response.data.email);
+    return response.data;
+  } catch (error: unknown) {
+    console.error("API Error fetching /me:", error);
+    // Rethrow or handle specific errors (e.g., 401 Unauthorized)
+    throw error;
   }
 };
 

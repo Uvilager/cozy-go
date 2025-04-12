@@ -1,15 +1,18 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query"; // Add useQuery
 import { useRouter } from "next/navigation"; // For redirection
 import {
   login,
+  getMe, // Import getMe API function
   register,
   LoginPayload,
   RegisterPayload,
   AuthResponse,
+  User, // Import User type
 } from "@/lib/api/auth";
 import { useAuthStore } from "@/store/authStore";
 import { toast } from "sonner";
 import Cookies from "js-cookie"; // Import js-cookie
+import { queryKeys } from "@/lib/queryKeys"; // Import queryKeys
 
 /**
  * Custom hook for user login.
@@ -63,8 +66,11 @@ export const useRegister = () => {
   });
 };
 
+import { useQueryClient } from "@tanstack/react-query"; // Import queryClient hook
+
 // Optional: Add a useLogout hook if logout requires API calls or complex client-side cleanup
 export const useLogout = () => {
+  const queryClient = useQueryClient(); // Get query client instance
   const clearAuth = useAuthStore((state) => state.clearAuth);
   const router = useRouter();
 
@@ -76,10 +82,34 @@ export const useLogout = () => {
     clearAuth();
     // 2. Remove the auth cookie
     Cookies.remove("authToken", { path: "/" }); // Use the same name and path
+    // 3. Remove the user query data from React Query cache
+    queryClient.removeQueries({ queryKey: queryKeys.user });
     toast.success("Logged out successfully.");
-    // 3. Redirect to login page
+    // 4. Redirect to login page
     router.push("/login");
   };
 
   return logoutAction;
+};
+
+/**
+ * Custom hook to fetch the current user's data.
+ * Uses React Query to manage fetching, caching, and state.
+ */
+export const useUser = () => {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated); // Check auth status
+
+  return useQuery<User, Error>({
+    queryKey: queryKeys.user,
+    queryFn: () => getMe(), // Wrap getMe call
+    enabled: isAuthenticated, // Only run the query if the user is authenticated (has token)
+    staleTime: 5 * 60 * 1000, // 5 minutes - how long data is considered fresh
+    gcTime: 60 * 60 * 1000, // 1 hour - Renamed from cacheTime in v5
+    retry: 1, // Retry once on error
+    // Optional: Add error handling specific to this query if needed
+    // onError: (error) => {
+    //   console.error("Error fetching user data:", error);
+    //   // Maybe clear auth state if token is invalid (e.g., 401 error)?
+    // },
+  });
 };

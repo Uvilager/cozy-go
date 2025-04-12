@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 // Define paths that require authentication
-const protectedPaths = ["/tasks", "/settings"]; // Add other protected paths as needed
+const protectedPaths = ["/tasks", "/settings", "/calendar"]; // Add /calendar
 
 // Define paths that should only be accessible to unauthenticated users
 const publicOnlyPaths = ["/login", "/register"];

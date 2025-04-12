@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"log" // Ensure log is imported
 
 	"auth-service/internal/models"
 
@@ -14,7 +15,8 @@ import (
 type AuthRepository interface {
 	Authenticate(user models.User) (bool, error)
 	Register(user models.User) (int, error)
-	GetUserByEmail(ctx context.Context, email string) (*models.User, error) // Added method signature
+	GetUserByEmail(ctx context.Context, email string) (*models.User, error)
+	GetUserByID(ctx context.Context, id int) (*models.User, error) // Added for /me endpoint
 }
 
 type authRepository struct {
@@ -78,5 +80,29 @@ func (r *authRepository) GetUserByEmail(ctx context.Context, email string) (*mod
 	}
 
 	// User found, return the user struct
+	return user, nil
+}
+
+// GetUserByID retrieves a user by their ID.
+// Excludes the password hash for security.
+func (r *authRepository) GetUserByID(ctx context.Context, id int) (*models.User, error) {
+	query := `SELECT id, username, email FROM users WHERE id = $1`
+	user := &models.User{}
+
+	err := r.db.QueryRow(ctx, query, id).Scan(
+		&user.ID,
+		&user.Username,
+		&user.Email,
+		// Do NOT scan password here
+	)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil // Return nil user and nil error to indicate not found
+		}
+		log.Printf("Error fetching user by ID %d: %v", id, err)
+		return nil, err
+	}
+
 	return user, nil
 }

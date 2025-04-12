@@ -9,9 +9,11 @@ export const taskSchema = z.object({
   status: z.string(), // Consider z.enum if using custom types consistently
   label: z.string().nullish(), // Added field from backend (optional/nullable)
   priority: z.string(), // Consider z.enum
-  due_date: z.string().nullish(), // Added field from backend (assuming string format like ISO 8601, nullable)
-  created_at: z.string(), // Added field from backend (assuming string format)
-  updated_at: z.string(), // Added field from backend (assuming string format)
+  due_date: z.string().nullish(), // Assuming string format like ISO 8601, nullable
+  start_time: z.string().nullish(), // Optional start time (ISO 8601 string)
+  end_time: z.string().nullish(), // Optional end time (ISO 8601 string)
+  created_at: z.string(), // Assuming string format
+  updated_at: z.string(), // Assuming string format
 });
 
 // This type now includes all fields from the backend
