@@ -4,8 +4,6 @@ import React from "react";
 import { format } from "date-fns";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react"; // Add Plus here
 import { Button } from "@/components/ui/button";
-// import { Plus } from "lucide-react"; // Remove duplicate
-import { cn } from "@/lib/utils"; // For conditional button styling
 import AddEventDialog from "./add/add-event-dialog"; // Import the dialog
 
 export type CalendarView = "month" | "week" | "day";

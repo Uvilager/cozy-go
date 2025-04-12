@@ -48,7 +48,7 @@ export const useLogin = () => {
  * Note: Does not log the user in automatically based on current API design.
  */
 export const useRegister = () => {
-  // const router = useRouter();
+  const router = useRouter();
 
   return useMutation<{ message: string }, Error, RegisterPayload>({
     mutationFn: register, // The API function to call for registration
@@ -56,7 +56,7 @@ export const useRegister = () => {
       // On successful registration, show success message
       toast.success(data.message || "Registration successful!");
       // Redirect to the login page after successful registration
-      // router.push("/login");
+      router.push("/login");
     },
     onError: (error) => {
       // Display the error message using toast

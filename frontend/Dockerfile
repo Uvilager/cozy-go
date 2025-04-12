@@ -8,7 +8,7 @@ WORKDIR /app
 # Install dependencies based on the preferred package manager
 # Detect package manager based on lock file
 COPY package-lock.json* package.json ./
-RUN npm install --frozen-lockfile
+RUN npm install --frozen-lockfile --legacy-peer-deps
 
 # Copy the rest of the application code
 COPY . .

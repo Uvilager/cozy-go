@@ -4,7 +4,6 @@ import React from "react";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -15,7 +14,6 @@ import { Task } from "../tasks/data/schema"; // Import Task type
 import { format } from "date-fns"; // For formatting dates/times
 import { Badge } from "@/components/ui/badge"; // For displaying status/priority/label
 import { useDeleteTask } from "@/hooks/useTasks"; // Import delete hook
-// import { toast } from "sonner"; // No longer needed directly here
 import { CustomAlertDialog } from "../alert-dialog"; // Import custom alert dialog
 import EditEventDialog from "./edit/edit-event-dialog"; // Import the edit dialog
 
@@ -49,7 +47,7 @@ export default function TaskDetailDialog({
 
   // Helper to format date/time ranges nicely
   const formatDateTimeRange = (task: Task): string => {
-    let dateStr = task.due_date
+    const dateStr = task.due_date
       ? format(new Date(task.due_date), "PPP")
       : "No due date";
     let timeStr = "";

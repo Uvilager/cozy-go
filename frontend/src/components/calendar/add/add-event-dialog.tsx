@@ -8,9 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-  DialogFooter, // If needed for separate buttons
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 // Import the form component
 import AddEventForm from "./add-event-form";
 

@@ -10,9 +10,6 @@ import {
   eachDayOfInterval,
   isSameMonth,
   isToday,
-  getDay,
-  eachWeekOfInterval,
-  lastDayOfMonth,
 } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useTasksByProject } from "@/hooks/useTasks"; // Import the hook

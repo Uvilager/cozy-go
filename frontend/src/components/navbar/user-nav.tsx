@@ -17,13 +17,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
-import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
+import { Avatar, AvatarFallback } from "../ui/avatar";
 // import { useAuthStore } from "@/store/authStore"; // Remove auth store import
 import { useUser, useLogout } from "@/hooks/useAuth"; // Import useUser and useLogout hooks
-
-interface DropdownMenuWithAvatarProps {
-  // onLogout prop is no longer needed as we get it from the hook
-}
 
 // Helper to get initials from username or email
 const getInitials = (name?: string, email?: string): string => {
