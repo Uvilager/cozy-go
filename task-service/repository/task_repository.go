@@ -103,7 +103,7 @@ func (r *pgTaskRepository) CreateTask(ctx context.Context, task *models.Task, us
 
 // GetTaskByID retrieves a task by its ID, ensuring it belongs to the given user via the project.
 func (r *pgTaskRepository) GetTaskByID(ctx context.Context, id int, userID int) (*models.Task, error) {
-	query := `SELECT t.id, t.project_id, t.title, t.description, t.status, t.label, t.priority, t.due_date, t.created_at, t.updated_at
+	query := `SELECT t.id, t.project_id, t.title, t.description, t.status, t.label, t.priority, t.due_date, t.start_time, t.end_time, t.created_at, t.updated_at
               FROM tasks t
               JOIN projects p ON t.project_id = p.id
               WHERE t.id = $1 AND p.user_id = $2` // Check task ID and project ownership
@@ -117,6 +117,8 @@ func (r *pgTaskRepository) GetTaskByID(ctx context.Context, id int, userID int) 
 		&task.Label,
 		&task.Priority,
 		&task.DueDate,
+		&task.StartTime, // Scan StartTime
+		&task.EndTime,   // Scan EndTime
 		&task.CreatedAt,
 		&task.UpdatedAt,
 	)
@@ -144,7 +146,7 @@ func (r *pgTaskRepository) GetTasksByProjectID(ctx context.Context, projectID in
 	}
 
 	// 2. Proceed with fetching tasks if ownership is verified
-	query := `SELECT id, project_id, title, description, status, label, priority, due_date, created_at, updated_at
+	query := `SELECT id, project_id, title, description, status, label, priority, due_date, start_time, end_time, created_at, updated_at
               FROM tasks
               WHERE project_id = $1
               ORDER BY created_at DESC` // Example ordering
@@ -168,6 +170,8 @@ func (r *pgTaskRepository) GetTasksByProjectID(ctx context.Context, projectID in
 			&task.Label,
 			&task.Priority,
 			&task.DueDate,
+			&task.StartTime, // Scan StartTime
+			&task.EndTime,   // Scan EndTime
 			&task.CreatedAt,
 			&task.UpdatedAt,
 		)

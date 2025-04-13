@@ -57,11 +57,14 @@ const combineDateAndTime = (
 
 interface AddEventFormProps {
   onSuccess: () => void; // Callback to close dialog on success
-  // Add props for default date if clicking on a specific day
-  // defaultDate?: Date;
+  defaultDate?: Date; // Optional date to pre-fill
 }
 
-export default function AddEventForm({ onSuccess }: AddEventFormProps) {
+export default function AddEventForm({
+  onSuccess,
+  defaultDate,
+}: AddEventFormProps) {
+  // Destructure defaultDate
   // TODO: Get projectId from context or a selector component later
   const tempProjectId = 6; // Hardcode project ID 1 for now
 
@@ -77,7 +80,7 @@ export default function AddEventForm({ onSuccess }: AddEventFormProps) {
     defaultValues: {
       title: "",
       description: "",
-      dueDate: undefined, // Or set to defaultDate prop if provided
+      dueDate: defaultDate ?? undefined, // Use defaultDate if provided
       startTime: "",
       endTime: "",
       // Initialize other fields

@@ -15,9 +15,11 @@ import { cn } from "@/lib/utils";
 import { useTasksByProject } from "@/hooks/useTasks"; // Import the hook
 import { Task } from "../tasks/data/schema"; // Import Task type
 import TaskDetailDialog from "./task-detail-dialog"; // Import the dialog component
+import { Badge } from "@/components/ui/badge"; // Import Badge
 
 interface MonthViewProps {
   currentDate: Date; // First day of the month to display
+  onDayClick?: (date: Date) => void; // Add callback for clicking a day cell
   // Add props for events, event handlers etc. later
 }
 
@@ -31,7 +33,8 @@ const getCalendarDays = (monthDate: Date) => {
   return eachDayOfInterval({ start: startDate, end: endDate });
 };
 
-export default function MonthView({ currentDate }: MonthViewProps) {
+export default function MonthView({ currentDate, onDayClick }: MonthViewProps) {
+  // Add onDayClick to destructuring
   // --- Data Fetching ---
   // TODO: Get projectId dynamically later
   const projectId = 6; // Use the same hardcoded project ID as the form for now
@@ -108,12 +111,12 @@ export default function MonthView({ currentDate }: MonthViewProps) {
           <div
             key={day.toISOString()}
             className={cn(
-              "border rounded-md p-1 flex flex-col",
+              "border rounded-md p-1 flex flex-col cursor-pointer hover:bg-accent hover:text-accent-foreground", // Add cursor/hover
               !isSameMonth(day, currentDate) &&
                 "bg-muted/50 text-muted-foreground", // Dim days outside current month
               isToday(day) && "bg-blue-100 dark:bg-blue-900" // Highlight today
             )}
-            // Add onClick handler here later
+            onClick={() => onDayClick?.(day)} // Call onDayClick prop when cell is clicked
           >
             <span
               className={cn(
@@ -128,15 +131,38 @@ export default function MonthView({ currentDate }: MonthViewProps) {
               {(tasksByDate[format(day, "yyyy-MM-dd")] || []).map((task) => (
                 <div
                   key={task.id}
-                  className="text-xs bg-primary/20 text-primary-foreground rounded px-1 truncate cursor-pointer hover:bg-primary/30"
+                  className="group relative flex items-center text-xs bg-primary/10 dark:bg-primary/30 text-primary-foreground rounded px-1 py-0.5 truncate cursor-pointer hover:bg-primary/20 dark:hover:bg-primary/40"
                   title={task.title} // Show full title on hover
-                  onClick={() => handleTaskClick(task)} // Add onClick handler
+                  onClick={(e) => {
+                    e.stopPropagation(); // Prevent day click handler when clicking task
+                    handleTaskClick(task);
+                  }}
                 >
-                  {/* Optionally show time if start_time exists */}
-                  {task.start_time
-                    ? format(new Date(task.start_time), "HH:mm") + " "
-                    : ""}
-                  {task.title}
+                  {/* Simple Priority Indicator (e.g., colored dot) - Customize as needed */}
+                  {task.priority === "high" && (
+                    <span className="mr-1 h-1.5 w-1.5 rounded-full bg-red-500 flex-shrink-0"></span>
+                  )}
+                  {task.priority === "medium" && (
+                    <span className="mr-1 h-1.5 w-1.5 rounded-full bg-yellow-500 flex-shrink-0"></span>
+                  )}
+                  {task.priority === "low" && (
+                    <span className="mr-1 h-1.5 w-1.5 rounded-full bg-green-500 flex-shrink-0"></span>
+                  )}
+
+                  {/* Time */}
+                  <span className="mr-1 flex-shrink-0">
+                    {task.start_time
+                      ? format(new Date(task.start_time), "HH:mm")
+                      : ""}
+                  </span>
+
+                  {/* Title */}
+                  <span className="flex-grow truncate">{task.title}</span>
+
+                  {/* Optional: Label Badge (keep it small) - shown on hover? */}
+                  {/* <Badge variant="secondary" className="absolute right-1 top-1/2 -translate-y-1/2 scale-75 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {task.label}
+                  </Badge> */}
                 </div>
               ))}
             </div>

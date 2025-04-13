@@ -13,21 +13,28 @@ import {
 import AddEventForm from "./add-event-form";
 
 interface AddEventDialogProps {
-  children: React.ReactNode; // The trigger element (e.g., a Button)
-  // Add props for default date/time later if needed
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void; // For closing via overlay/esc
+  onClose: () => void; // Explicit close function
+  defaultDate?: Date; // Optional date to pre-fill
 }
 
-export default function AddEventDialog({ children }: AddEventDialogProps) {
-  const [isOpen, setIsOpen] = React.useState(false);
+export default function AddEventDialog({
+  isOpen,
+  onOpenChange,
+  onClose,
+  defaultDate,
+}: AddEventDialogProps) {
+  // Remove internal state const [isOpen, setIsOpen] = React.useState(false);
 
   const handleSuccess = () => {
-    setIsOpen(false);
-    // Optionally trigger refetch here if mutation is handled outside the form
+    onClose(); // Call the passed onClose function
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>{children}</DialogTrigger>
+    // Use controlled dialog pattern
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      {/* Remove DialogTrigger */}
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Add New Event/Task</DialogTitle>
@@ -35,9 +42,8 @@ export default function AddEventDialog({ children }: AddEventDialogProps) {
             Fill in the details for your new calendar item.
           </DialogDescription>
         </DialogHeader>
-        {/* Render the form component */}
-        <AddEventForm onSuccess={handleSuccess} />
-        {/* Remove placeholder */}
+        {/* Render the form component, passing defaultDate */}
+        <AddEventForm onSuccess={handleSuccess} defaultDate={defaultDate} />
         {/* DialogFooter can be used if the form doesn't have its own submit button */}
         {/* <DialogFooter>
           <Button type="submit" form="add-event-form">Save changes</Button>

@@ -15,6 +15,7 @@ interface CalendarHeaderProps {
   onPrevious: () => void;
   onNext: () => void;
   onToday: () => void;
+  onAddEventClick: () => void; // Add callback for the create button
 }
 
 export default function CalendarHeader({
@@ -24,6 +25,7 @@ export default function CalendarHeader({
   onPrevious,
   onNext,
   onToday,
+  onAddEventClick, // Destructure the new prop
 }: CalendarHeaderProps) {
   // Format the displayed date range based on the view
   const displayDate = () => {
@@ -82,12 +84,11 @@ export default function CalendarHeader({
           Month
         </Button>
         {/* Wrap the Create button with the Dialog */}
-        <AddEventDialog>
-          <Button size="sm" className="ml-4">
-            <Plus className="mr-1 h-4 w-4" />
-            Create Event
-          </Button>
-        </AddEventDialog>
+        {/* Remove DialogTrigger wrapper, call prop directly */}
+        <Button size="sm" className="ml-4" onClick={onAddEventClick}>
+          <Plus className="mr-1 h-4 w-4" />
+          Create Event
+        </Button>
         {/* Placeholder for other items */}
       </div>
     </header>

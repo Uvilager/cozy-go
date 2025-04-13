@@ -16,9 +16,14 @@ import CalendarHeader, { CalendarView } from "@/components/calendar/header";
 import MonthView from "@/components/calendar/month-view";
 import WeekView from "@/components/calendar/week-view";
 import DayView from "@/components/calendar/day-view";
+import AddEventDialog from "@/components/calendar/add/add-event-dialog"; // Import Add dialog
 
 export default function CalendarPage() {
   const [view, setView] = useState<CalendarView>("month");
+  const [isAddEventDialogOpen, setIsAddEventDialogOpen] = useState(false);
+  const [selectedDateForNewEvent, setSelectedDateForNewEvent] = useState<
+    Date | undefined
+  >(undefined);
   // currentDate represents the reference point for the current view
   // For month view: the first day of the displayed month
   // For week view: the first day (e.g., Sunday/Monday) of the displayed week
@@ -67,12 +72,29 @@ export default function CalendarPage() {
     }
   };
 
+  // --- Handlers for Add Event Dialog ---
+  const handleOpenAddDialog = (date?: Date) => {
+    setSelectedDateForNewEvent(date); // Set the date if provided (from day click)
+    setIsAddEventDialogOpen(true);
+  };
+
+  const handleCloseAddDialog = () => {
+    setIsAddEventDialogOpen(false);
+    setSelectedDateForNewEvent(undefined); // Clear selected date on close
+  };
+
   const renderView = () => {
     switch (view) {
       case "month":
-        return <MonthView currentDate={currentDate} />;
-      // return <div className="p-4">Month View Placeholder</div>;
+        // Pass the handler for day clicks down to MonthView
+        return (
+          <MonthView
+            currentDate={currentDate}
+            onDayClick={handleOpenAddDialog}
+          />
+        );
       case "week":
+        // TODO: Pass similar handler to WeekView/DayView if needed
         return <WeekView currentDate={currentDate} />;
       // return <div className="p-4">Week View Placeholder</div>;
       case "day":
@@ -92,11 +114,23 @@ export default function CalendarPage() {
         onPrevious={handlePrevious}
         onNext={handleNext}
         onToday={handleToday}
+        onAddEventClick={() => handleOpenAddDialog()} // Pass handler for header button
       />
-      <div className="flex-1 overflow-auto">
-        {/* Render the current view component */}
+      {/* This div should allow the view component to fill remaining space */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {" "}
+        {/* Use overflow-hidden here */}
+        {/* Render the current view component - IT needs to handle its own internal scrolling */}
         {renderView()}
       </div>
+
+      {/* Render Add Event Dialog (controlled by state) */}
+      <AddEventDialog
+        isOpen={isAddEventDialogOpen}
+        onOpenChange={setIsAddEventDialogOpen} // Allows closing via overlay click/esc
+        onClose={handleCloseAddDialog} // Explicit close handler
+        defaultDate={selectedDateForNewEvent} // Pass selected date
+      />
     </div>
   );
 }
