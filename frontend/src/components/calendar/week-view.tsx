@@ -1,194 +1,204 @@
 "use client";
 
-import React from "react";
+import React, { useState, useMemo } from "react";
 import {
   format,
   startOfWeek,
   endOfWeek,
   eachDayOfInterval,
   isToday,
-  parseISO, // Import parseISO
+  parseISO,
+  getHours, // Import getHours
 } from "date-fns";
-import { cn } from "@/lib/utils"; // For conditional classes
-import { useState, useMemo } from "react"; // Import hooks directly
-import { useTasksByProject } from "@/hooks/useTasks"; // Import the hook
-import { Task } from "../tasks/data/schema"; // Import Task type
-import TaskDetailDialog from "./task-detail-dialog"; // Import the dialog component
+import { cn } from "@/lib/utils";
+import { useTasksByProject } from "@/hooks/useTasks";
+import { Task } from "../tasks/data/schema";
+import TaskDetailDialog from "./task-detail-dialog";
+import { Badge } from "@/components/ui/badge"; // Keep Badge
 
 interface WeekViewProps {
-  currentDate: Date; // Typically the first day of the week to display
-  onTimeSlotClick?: (date: Date) => void; // Callback for clicking an empty slot
-  // Add props for events, event handlers etc. later
+  currentDate: Date;
+  onTimeSlotClick?: (date: Date) => void;
 }
 
 export default function WeekView({
   currentDate,
   onTimeSlotClick,
 }: WeekViewProps) {
-  // Destructure new prop
-  // --- State & Data Fetching ---
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
-  // TODO: Get projectId dynamically later
-  const projectId = 6; // Use the same hardcoded project ID
+  const projectId = 6; // TODO: Replace hardcoded ID
   const { data: tasks, isLoading, error } = useTasksByProject(projectId);
 
-  // --- Calendar Calculations ---
-  const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 }); // Assuming Monday start
+  const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
   const days = eachDayOfInterval({ start: weekStart, end: weekEnd });
-  const hours = Array.from({ length: 24 }, (_, i) => i); // 0 to 23
+  const hours = Array.from({ length: 24 }, (_, i) => i);
 
-  // --- Group tasks by date ---
-  const tasksByDate = useMemo(() => {
-    const grouped: Record<string, Task[]> = {};
+  // --- Group tasks by DATE and then by START HOUR ---
+  const tasksByHourAndDay = useMemo(() => {
+    const grouped: Record<string, Record<number, Task[]>> = {}; // Key1: yyyy-MM-dd, Key2: hour (0-23)
     if (!tasks) return grouped;
+
     tasks.forEach((task) => {
-      // Group by start_time if available, otherwise due_date
       const dateToSortBy = task.start_time || task.due_date;
       if (dateToSortBy) {
         try {
-          const dateKey = format(parseISO(dateToSortBy), "yyyy-MM-dd");
+          const dateObj = parseISO(dateToSortBy);
+          const dateKey = format(dateObj, "yyyy-MM-dd");
+          const startHour = task.start_time
+            ? getHours(parseISO(task.start_time))
+            : -1; // Use -1 for tasks without start time (all-day?)
+
           if (!grouped[dateKey]) {
-            grouped[dateKey] = [];
+            grouped[dateKey] = {};
           }
-          // Sort tasks within a day by start time (if available)
-          grouped[dateKey].push(task);
-          grouped[dateKey].sort((a, b) => {
-            const timeA = a.start_time ? parseISO(a.start_time).getTime() : 0;
-            const timeB = b.start_time ? parseISO(b.start_time).getTime() : 0;
-            return timeA - timeB;
-          });
+          if (startHour >= 0) {
+            // Only group timed tasks by hour
+            if (!grouped[dateKey][startHour]) {
+              grouped[dateKey][startHour] = [];
+            }
+            grouped[dateKey][startHour].push(task);
+            // Sort tasks within the hour
+            grouped[dateKey][startHour].sort((a, b) => {
+              const timeA = a.start_time ? parseISO(a.start_time).getTime() : 0;
+              const timeB = b.start_time ? parseISO(b.start_time).getTime() : 0;
+              return timeA - timeB;
+            });
+          }
+          // TODO: Handle tasks without start_time separately if needed (e.g., all-day section)
         } catch (e) {
-          console.error("Error parsing task date:", dateToSortBy, e);
+          console.error(
+            "Error parsing task date for grouping:",
+            dateToSortBy,
+            e
+          );
         }
       }
     });
     return grouped;
   }, [tasks]);
 
-  // --- Handlers ---
   const handleTaskClick = (task: Task) => {
     setSelectedTask(task);
     setIsDetailOpen(true);
   };
 
-  // --- Rendering ---
-  if (isLoading) {
-    return <div className="p-4 text-center">Loading tasks...</div>;
-  }
-  if (error) {
+  if (isLoading) return <div className="p-4 text-center">Loading tasks...</div>;
+  if (error)
     return (
       <div className="p-4 text-center text-destructive">
         Error loading tasks: {error.message}
       </div>
     );
-  }
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Week Header (Days) */}
-      <div className="grid grid-cols-[auto_repeat(7,1fr)] sticky top-0 bg-background z-10 border-b">
-        {/* Top-left corner spacer */}
-        <div className="py-2 border-r"></div>
-        {/* Day Headers */}
-        {days.map((day) => (
-          <div
-            key={day.toISOString()}
-            className="text-center font-medium text-sm py-1 border-r last:border-r-0"
-          >
-            {format(day, "EEE")} {/* Mon, Tue, etc. */}
+    <>
+      {" "}
+      {/* Fragment for Dialog */}
+      <div className="flex flex-col h-full">
+        {/* Week Header */}
+        <div className="grid grid-cols-[auto_repeat(7,1fr)] sticky top-0 bg-background z-10 border-b">
+          <div className="py-2 border-r"></div> {/* Spacer */}
+          {days.map((day) => (
             <div
-              className={cn(
-                "text-lg font-semibold",
-                isToday(day) && "text-blue-600"
-              )}
+              key={day.toISOString()}
+              className="text-center font-medium text-sm py-1 border-r last:border-r-0"
             >
-              {format(day, "d")} {/* 1, 2, etc. */}
+              {format(day, "EEE")}
+              <div
+                className={cn(
+                  "text-lg font-semibold",
+                  isToday(day) && "text-blue-600"
+                )}
+              >
+                {format(day, "d")}
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
 
-      {/* Scrollable Body (Time Slots & Events) */}
-      <div className="flex-1 overflow-auto">
-        <div className="grid grid-cols-[auto_repeat(7,1fr)]">
-          {/* Time Column */}
-          <div className="row-span-full">
-            {hours.map((hour) => (
-              <div
-                key={`time-${hour}`}
-                className="h-12 text-right pr-2 text-xs text-muted-foreground border-r border-b flex items-center justify-end"
-              >
-                {format(new Date(0, 0, 0, hour), "ha")} {/* 12AM, 1AM, etc. */}
-              </div>
-            ))}
-          </div>
-
-          {/* Event Grid Cells - Render tasks within day columns */}
-          {days.map((day) => {
-            const dayKey = format(day, "yyyy-MM-dd");
-            const dayTasks = tasksByDate[dayKey] || [];
-
-            return (
-              <div
-                key={`day-col-${day.toISOString()}`}
-                className="relative border-r last:border-r-0"
-              >
-                {/* Render hour lines */}
-                {hours.map((hour) => (
-                  <div
-                    key={`cell-${day.toISOString()}-${hour}`}
-                    className="h-12 border-b cursor-pointer hover:bg-accent/50" // Already has hover
-                    onClick={() => {
-                      const clickedDateTime = new Date(day);
-                      clickedDateTime.setHours(hour, 0, 0, 0); // Set hour, reset minutes/seconds
-                      onTimeSlotClick?.(clickedDateTime);
-                    }}
-                  ></div>
-                ))}
-                {/* Render tasks for this day (simple list for now, positioning later) */}
-                {/* Add pointer-events-none to allow clicks/hovers on underlying slots */}
-                <div className="absolute inset-0 p-1 space-y-1 overflow-y-auto pointer-events-none">
-                  {dayTasks.map((task) => (
-                    <div
-                      // Add pointer-events-auto back onto the task itself so it's clickable
-                      className="pointer-events-auto group relative flex items-center text-xs bg-primary/10 dark:bg-primary/30 text-primary-foreground rounded px-1 py-0.5 truncate cursor-pointer hover:bg-primary/20 dark:hover:bg-primary/40"
-                      key={task.id}
-                      title={task.title}
-                      onClick={(e) => {
-                        e.stopPropagation(); // Keep stopping propagation
-                        handleTaskClick(task);
-                      }}
-                      // TODO: Add absolute positioning based on start/end times
-                    >
-                      {/* Priority Indicator */}
-                      {task.priority === "high" && (
-                        <span className="mr-1 h-1.5 w-1.5 rounded-full bg-red-500 flex-shrink-0"></span>
-                      )}
-                      {task.priority === "medium" && (
-                        <span className="mr-1 h-1.5 w-1.5 rounded-full bg-yellow-500 flex-shrink-0"></span>
-                      )}
-                      {task.priority === "low" && (
-                        <span className="mr-1 h-1.5 w-1.5 rounded-full bg-green-500 flex-shrink-0"></span>
-                      )}
-                      {/* Time */}
-                      <span className="mr-1 flex-shrink-0">
-                        {task.start_time
-                          ? format(parseISO(task.start_time), "HH:mm")
-                          : ""}
-                      </span>
-                      {/* Title */}
-                      <span className="flex-grow truncate">{task.title}</span>
-                    </div>
-                  ))}
+        {/* Scrollable Body */}
+        <div className="flex-1 overflow-auto">
+          <div className="grid grid-cols-[auto_repeat(7,1fr)]">
+            {/* Time Column */}
+            <div className="row-span-full">
+              {hours.map((hour) => (
+                <div
+                  key={`time-${hour}`}
+                  className="h-12 text-right pr-2 text-xs text-muted-foreground border-r border-b flex items-center justify-end"
+                >
+                  {format(new Date(0, 0, 0, hour), "ha")}
                 </div>
-              </div>
-            );
-          })}
+              ))}
+            </div>
+
+            {/* Day Columns */}
+            {days.map((day) => {
+              const dayKey = format(day, "yyyy-MM-dd");
+              const tasksForDay = tasksByHourAndDay[dayKey] || {}; // Get tasks grouped by hour for this day
+
+              return (
+                <div
+                  key={`day-col-${day.toISOString()}`}
+                  className="relative border-r last:border-r-0"
+                >
+                  {/* Render hour slots and tasks within them */}
+                  {hours.map((hour) => {
+                    const tasksInHour = tasksForDay[hour] || []; // Get tasks for this specific hour
+                    return (
+                      <div
+                        key={`cell-${day.toISOString()}-${hour}`}
+                        className="h-12 border-b cursor-pointer hover:bg-accent/50 relative p-1 space-y-0.5 overflow-hidden" // Add relative and padding/overflow
+                        onClick={() => {
+                          const clickedDateTime = new Date(day);
+                          clickedDateTime.setHours(hour, 0, 0, 0);
+                          onTimeSlotClick?.(clickedDateTime);
+                        }}
+                      >
+                        {/* Render tasks starting in this hour */}
+                        {tasksInHour.map((task) => (
+                          <div
+                            key={task.id}
+                            className="group relative flex items-center text-xs bg-primary/10 dark:bg-primary/30 text-primary-foreground rounded px-1 truncate cursor-pointer hover:bg-primary/20 dark:hover:bg-primary/40"
+                            title={task.title}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleTaskClick(task);
+                            }}
+                          >
+                            {/* Priority Indicator */}
+                            {task.priority === "high" && (
+                              <span className="mr-1 h-1.5 w-1.5 rounded-full bg-red-500 flex-shrink-0"></span>
+                            )}
+                            {task.priority === "medium" && (
+                              <span className="mr-1 h-1.5 w-1.5 rounded-full bg-yellow-500 flex-shrink-0"></span>
+                            )}
+                            {task.priority === "low" && (
+                              <span className="mr-1 h-1.5 w-1.5 rounded-full bg-green-500 flex-shrink-0"></span>
+                            )}
+                            {/* Time */}
+                            <span className="mr-1 flex-shrink-0">
+                              {task.start_time
+                                ? format(parseISO(task.start_time), "HH:mm")
+                                : ""}
+                            </span>
+                            {/* Title */}
+                            <span className="flex-grow truncate">
+                              {task.title}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })}
+                  {/* Removed the separate absolute positioned task rendering div */}
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
-
       {/* Render the Task Detail Dialog */}
       <TaskDetailDialog
         task={selectedTask}
@@ -196,6 +206,6 @@ export default function WeekView({
         onClose={() => setIsDetailOpen(false)}
         projectId={projectId}
       />
-    </div>
+    </>
   );
 }

@@ -102,8 +102,13 @@ export default function CalendarPage() {
           />
         );
       case "day":
-        return <DayView currentDate={currentDate} />;
-      // return <div className="p-4">Day View Placeholder</div>;
+        // Pass the handler for time slot clicks down to DayView
+        return (
+          <DayView
+            currentDate={currentDate}
+            onTimeSlotClick={handleOpenAddDialog}
+          />
+        );
       default:
         return null;
     }
