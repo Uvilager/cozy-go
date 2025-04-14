@@ -13,14 +13,22 @@ export default function DayView({ currentDate }: DayViewProps) {
   const hours = Array.from({ length: 24 }, (_, i) => i); // 0 to 23
 
   return (
-    <div className="p-4 border rounded-md m-4 flex flex-col">
-      <h2 className="text-lg font-semibold mb-4 text-center">
+    // Ensure this component fills the height provided by its parent in CalendarPage
+    <div className="flex flex-col h-full">
+      {/* Removed outer padding/margin/border - apply within page if needed */}
+      {/* Header for the day - could be part of CalendarHeader or kept here */}
+      {/* <h2 className="text-lg font-semibold mb-4 text-center p-4 border-b">
         {format(currentDate, "EEEE, MMMM d, yyyy")}
-      </h2>
-      <div className="flex-1 overflow-auto">
+      </h2> */}
+      {/* Scrollable time grid area */}
+      <div className="flex-1 overflow-auto p-4">
+        {" "}
+        {/* Add padding here if desired */}
         <div className="relative grid grid-cols-[auto_1fr] gap-x-2">
           {/* Time column */}
-          <div className="flex flex-col">
+          <div className="flex flex-col sticky top-0 bg-background z-10">
+            {" "}
+            {/* Make time sticky */}
             {hours.map((hour) => (
               <div
                 key={hour}

@@ -94,9 +94,13 @@ export default function CalendarPage() {
           />
         );
       case "week":
-        // TODO: Pass similar handler to WeekView/DayView if needed
-        return <WeekView currentDate={currentDate} />;
-      // return <div className="p-4">Week View Placeholder</div>;
+        // Pass the handler for time slot clicks down to WeekView
+        return (
+          <WeekView
+            currentDate={currentDate}
+            onTimeSlotClick={handleOpenAddDialog}
+          />
+        );
       case "day":
         return <DayView currentDate={currentDate} />;
       // return <div className="p-4">Day View Placeholder</div>;

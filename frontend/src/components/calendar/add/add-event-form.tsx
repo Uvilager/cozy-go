@@ -80,9 +80,13 @@ export default function AddEventForm({
     defaultValues: {
       title: "",
       description: "",
-      dueDate: defaultDate ?? undefined, // Use defaultDate if provided
-      startTime: "",
-      endTime: "",
+      dueDate: defaultDate ?? undefined,
+      // Pre-fill startTime if defaultDate has a non-midnight hour
+      startTime:
+        defaultDate && defaultDate.getHours() !== 0
+          ? format(defaultDate, "HH:mm")
+          : "",
+      endTime: "", // Keep endTime empty initially
       // Initialize other fields
     },
   });
