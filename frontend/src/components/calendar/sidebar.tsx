@@ -2,29 +2,39 @@
 
 import React from "react";
 import { Calendar } from "@/components/ui/calendar"; // Import shadcn calendar
-// Import Project Picker
+// Import Project Picker using named import
 import { ProjectPicker } from "@/components/projects/project-picker"; // Adjust path if needed
 
-export default function Sidebar() {
-  const [month, setMonth] = React.useState<Date>(new Date()); // State for mini-calendar month
-  const [selectedProjectId, setSelectedProjectId] = React.useState<
-    number | undefined
-  >(undefined); // State for selected project
+interface SidebarProps {
+  currentDate: Date; // Current date from parent for mini-calendar month control
+  selectedProjectId: number | undefined; // Currently selected project ID from parent
+  onNavigateDate: (date: Date) => void; // Callback to change main calendar date
+  onProjectChange: (projectId: number | undefined) => void; // Callback to change selected project
+}
+
+export default function Sidebar({
+  currentDate,
+  selectedProjectId,
+  onNavigateDate,
+  onProjectChange,
+}: SidebarProps) {
+  // State for the mini-calendar's *displayed* month (can differ from main calendar)
+  const [miniCalMonth, setMiniCalMonth] = React.useState<Date>(currentDate);
+
+  // Update mini-calendar month if main calendar date changes significantly
+  React.useEffect(() => {
+    setMiniCalMonth(currentDate);
+  }, [currentDate]);
 
   const handleDateSelect = (date: Date | undefined) => {
     if (!date) return;
     console.log("Mini-calendar date selected:", date);
-    // TODO: Implement logic to navigate main calendar view
-    // This likely requires lifting state up or using a context/store
-    setMonth(date); // Update mini-calendar display for now
+    onNavigateDate(date); // Call parent handler to update main calendar
+    // No need to setMiniCalMonth here, parent state change will trigger useEffect
   };
 
-  const handleProjectChange = (projectId: number | undefined) => {
-    console.log("Sidebar: Project selected:", projectId);
-    setSelectedProjectId(projectId);
-    // TODO: Implement logic to update the main calendar view based on the selected project
-    // This likely requires lifting state up or using a context/store
-  };
+  // Project change is now directly handled by the prop callback
+  // const handleProjectChange = (projectId: number | undefined) => { ... }
 
   return (
     <aside className="w-64 border-r p-4 hidden md:block">
@@ -35,11 +45,11 @@ export default function Sidebar() {
       <div className="mb-6">
         <Calendar
           mode="single"
-          selected={month} // Highlight selected day (or keep it simple for now)
-          onSelect={handleDateSelect}
-          month={month} // Control the displayed month
-          onMonthChange={setMonth} // Allow user to change month in mini-calendar
-          className="rounded-md border p-0" // Adjust padding/border as needed
+          // selected={currentDate} // Highlight the main calendar's date? Or keep local selection? Let's keep it simple for now.
+          onSelect={handleDateSelect} // Use the updated handler
+          month={miniCalMonth} // Control displayed month with local state
+          onMonthChange={setMiniCalMonth} // Allow changing month locally
+          className="rounded-md border p-0"
           classNames={{
             // Make it more compact
             caption_label: "text-sm font-medium",
@@ -68,10 +78,12 @@ export default function Sidebar() {
       <div className="mb-6">
         <h3 className="text-md font-semibold mb-2">Project</h3>
         <ProjectPicker
-          selectedProjectId={selectedProjectId} // Pass current selection (optional for picker)
-          onProjectChange={handleProjectChange} // Pass the handler
+          // Pass down the selected project ID (as string) and the change handler
+          currentProjectId={selectedProjectId?.toString()}
+          onProjectChange={(
+            idStr: string | undefined // Add type annotation
+          ) => onProjectChange(idStr ? parseInt(idStr, 10) : undefined)}
         />
-        {/* Remove placeholder */}
       </div>
       {/* Add other sidebar elements if needed */}
     </aside>

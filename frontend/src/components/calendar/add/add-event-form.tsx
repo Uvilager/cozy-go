@@ -58,18 +58,16 @@ const combineDateAndTime = (
 interface AddEventFormProps {
   onSuccess: () => void; // Callback to close dialog on success
   defaultDate?: Date; // Optional date to pre-fill
+  projectId?: number | undefined; // Add projectId prop
 }
 
 export default function AddEventForm({
   onSuccess,
   defaultDate,
+  projectId, // Destructure projectId
 }: AddEventFormProps) {
-  // Destructure defaultDate
-  // TODO: Get projectId from context or a selector component later
-  const tempProjectId = 6; // Hardcode project ID 1 for now
-
-  const createTaskMutation = useCreateTask(tempProjectId, {
-    // Pass hardcoded ID
+  const createTaskMutation = useCreateTask(projectId, {
+    // Use projectId prop
     // Pass the onSuccess callback from props to the hook's options
     onSuccess: onSuccess,
     // onError is handled internally by the hook (shows toast), but could add more here if needed
@@ -108,8 +106,8 @@ export default function AddEventForm({
         combineDateAndTime(values.dueDate, values.endTime)?.toISOString() ??
         null,
       // Map other fields...
-      // TEMP Placeholder values - replace with actual logic
-      project_id: tempProjectId, // Use the hardcoded project ID
+      // Use the projectId from props
+      project_id: projectId ?? 0, // Send 0 or handle error if projectId is undefined
       label: "", // TODO: Add Label selector
       priority: "medium", // TODO: Add Priority selector
       status: "todo",
@@ -126,6 +124,14 @@ export default function AddEventForm({
         // TODO: Show user-friendly error message
       },
     });
+    // Add a check before mutating if projectId is truly required
+    if (projectId === undefined) {
+      console.error("Cannot submit task without a project ID");
+      // Optionally show a toast error to the user
+      // toast.error("Please select a project first.");
+      return; // Prevent submission
+    }
+    createTaskMutation.mutate(apiPayload); // Removed the second options object here
   }
 
   return (

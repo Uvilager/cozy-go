@@ -14,20 +14,21 @@ import { cn } from "@/lib/utils";
 import { useTasksByProject } from "@/hooks/useTasks";
 import { Task } from "../tasks/data/schema";
 import TaskDetailDialog from "./task-detail-dialog";
-import { Badge } from "@/components/ui/badge"; // Keep Badge
 
 interface WeekViewProps {
   currentDate: Date;
-  onTimeSlotClick?: (date: Date) => void;
+  onTimeSlotClick?: (date: Date) => void; // Callback for clicking an empty slot
+  projectId?: number | undefined; // Add projectId prop
 }
 
 export default function WeekView({
   currentDate,
   onTimeSlotClick,
+  projectId, // Destructure projectId
 }: WeekViewProps) {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
-  const projectId = 6; // TODO: Replace hardcoded ID
+  // Use the projectId passed from props
   const { data: tasks, isLoading, error } = useTasksByProject(projectId);
 
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });

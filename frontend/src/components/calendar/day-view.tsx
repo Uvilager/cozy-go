@@ -8,25 +8,25 @@ import {
   isToday as isTodayCheck,
   getHours,
 } from "date-fns";
-import { cn } from "@/lib/utils";
 import { useTasksByProject } from "@/hooks/useTasks";
 import { Task } from "../tasks/data/schema";
 import TaskDetailDialog from "./task-detail-dialog";
-import { Badge } from "@/components/ui/badge";
 
 interface DayViewProps {
   currentDate: Date; // The specific day to display
   onTimeSlotClick?: (date: Date) => void; // Callback for clicking an empty slot
+  projectId?: number | undefined; // Add projectId prop
 }
 
 export default function DayView({
   currentDate,
   onTimeSlotClick,
+  projectId, // Destructure projectId
 }: DayViewProps) {
   // --- State & Data Fetching ---
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
-  const projectId = 6; // TODO: Replace hardcoded ID
+  // Use the projectId passed from props
   const { data: allTasks, isLoading, error } = useTasksByProject(projectId);
 
   // --- Calendar Calculations ---

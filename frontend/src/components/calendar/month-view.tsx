@@ -15,12 +15,11 @@ import { cn } from "@/lib/utils";
 import { useTasksByProject } from "@/hooks/useTasks"; // Import the hook
 import { Task } from "../tasks/data/schema"; // Import Task type
 import TaskDetailDialog from "./task-detail-dialog"; // Import the dialog component
-import { Badge } from "@/components/ui/badge"; // Import Badge
 
 interface MonthViewProps {
   currentDate: Date; // First day of the month to display
   onDayClick?: (date: Date) => void; // Add callback for clicking a day cell
-  // Add props for events, event handlers etc. later
+  projectId?: number | undefined; // Add projectId prop
 }
 
 // Helper to get days for the calendar grid
@@ -33,11 +32,14 @@ const getCalendarDays = (monthDate: Date) => {
   return eachDayOfInterval({ start: startDate, end: endDate });
 };
 
-export default function MonthView({ currentDate, onDayClick }: MonthViewProps) {
-  // Add onDayClick to destructuring
+export default function MonthView({
+  currentDate,
+  onDayClick,
+  projectId,
+}: MonthViewProps) {
+  // Destructure projectId
   // --- Data Fetching ---
-  // TODO: Get projectId dynamically later
-  const projectId = 6; // Use the same hardcoded project ID as the form for now
+  // Use the projectId passed from props
   const { data: tasks, isLoading, error } = useTasksByProject(projectId);
 
   // --- State for Task Detail/Edit ---

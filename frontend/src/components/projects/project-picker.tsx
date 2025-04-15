@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import { useState, useEffect, useMemo } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
 // Import useMutation if/when create project functionality is added
 // import { useMutation } from "@tanstack/react-query";
 

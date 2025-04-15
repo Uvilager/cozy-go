@@ -7,7 +7,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 // Import the form component
 import AddEventForm from "./add-event-form";
@@ -17,6 +16,7 @@ interface AddEventDialogProps {
   onOpenChange: (open: boolean) => void; // For closing via overlay/esc
   onClose: () => void; // Explicit close function
   defaultDate?: Date; // Optional date to pre-fill
+  projectId?: number | undefined; // Add projectId prop
 }
 
 export default function AddEventDialog({
@@ -24,9 +24,8 @@ export default function AddEventDialog({
   onOpenChange,
   onClose,
   defaultDate,
+  projectId, // Destructure projectId
 }: AddEventDialogProps) {
-  // Remove internal state const [isOpen, setIsOpen] = React.useState(false);
-
   const handleSuccess = () => {
     onClose(); // Call the passed onClose function
   };
@@ -42,8 +41,12 @@ export default function AddEventDialog({
             Fill in the details for your new calendar item.
           </DialogDescription>
         </DialogHeader>
-        {/* Render the form component, passing defaultDate */}
-        <AddEventForm onSuccess={handleSuccess} defaultDate={defaultDate} />
+        {/* Render the form component, passing defaultDate and projectId */}
+        <AddEventForm
+          onSuccess={handleSuccess}
+          defaultDate={defaultDate}
+          projectId={projectId}
+        />
         {/* DialogFooter can be used if the form doesn't have its own submit button */}
         {/* <DialogFooter>
           <Button type="submit" form="add-event-form">Save changes</Button>

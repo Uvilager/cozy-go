@@ -4,7 +4,6 @@ import React from "react";
 import { format } from "date-fns";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react"; // Add Plus here
 import { Button } from "@/components/ui/button";
-import AddEventDialog from "./add/add-event-dialog"; // Import the dialog
 
 export type CalendarView = "month" | "week" | "day";
 
@@ -29,6 +28,19 @@ export default function CalendarHeader({
 }: CalendarHeaderProps) {
   // Format the displayed date range based on the view
   const displayDate = () => {
+    // Add check for valid date before formatting
+    if (
+      !currentDate ||
+      !(currentDate instanceof Date) ||
+      isNaN(currentDate.getTime())
+    ) {
+      console.warn(
+        "CalendarHeader: Received invalid currentDate prop",
+        currentDate
+      );
+      return "..."; // Return loading or empty string
+    }
+
     switch (view) {
       case "month":
         return format(currentDate, "MMMM yyyy");
