@@ -62,10 +62,9 @@ const Layout = async ({ children }: LayoutProps) => {
   return (
     // Wrap children with HydrationBoundary
     <HydrationBoundary state={dehydrate(queryClient)}>
-      <div className="h-screen flex flex-col">
-        {/* Navbar might need to be a client component if it uses useUser hook */}
+      <div className="h-screen flex flex-col overflow-hidden">
         <Navbar />
-        <main className="flex-grow h-full container mx-auto p-4 overflow-hidden">
+        <main className="flex-grow container mx-auto px-2 sm:px-4 py-4 md:py-8 overflow-hidden">
           {children}
         </main>
         <Footer />
