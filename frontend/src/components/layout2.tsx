@@ -14,15 +14,13 @@ import { queryKeys } from "@/lib/queryKeys";
 // import { ModeToggle } from "@/components/navbar/mode-toggle";
 
 import { AppSidebar } from "@/components/sidebar/app-sidebar";
-import { HeaderContent } from "@/components/header/header-content"; // Import HeaderContent
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
+import { HeaderContent } from "@/components/header/header-content";
+import { DynamicBreadcrumbs } from "@/components/header/dynamic-breadcrumbs"; // Import DynamicBreadcrumbs
+// Remove unused Breadcrumb imports from here if DynamicBreadcrumbs handles them all
+// import {
+//   Breadcrumb,
+//   BreadcrumbList,
+// } from "@/components/ui/breadcrumb";
 import { Separator } from "@/components/ui/separator";
 import {
   SidebarInset,
@@ -101,12 +99,8 @@ const Layout = async ({ children }: LayoutProps) => {
                   orientation="vertical"
                   className="mx-2 data-[orientation=vertical]:h-6" /* Adjusted spacing/height */
                 />
-                {/* Empty Breadcrumb container for dynamic content later */}
-                <Breadcrumb>
-                  <BreadcrumbList>
-                    {/* Dynamic breadcrumbs would be added here */}
-                  </BreadcrumbList>
-                </Breadcrumb>
+                {/* Render the dynamic breadcrumbs component */}
+                <DynamicBreadcrumbs />
               </div>
               {/* Right side: Auth buttons and ModeToggle */}
               <HeaderContent />
