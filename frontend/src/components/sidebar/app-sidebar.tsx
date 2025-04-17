@@ -1,12 +1,13 @@
-"use client";
+"use client"; // Make this a client component
 
 import * as React from "react";
+import { usePathname } from "next/navigation"; // Import usePathname
 import {
   BookOpen,
   Bot,
   // Command, // Remove unused Command icon
   CheckSquare, // Add CheckSquare for logo and Tasks
-  Calendar, // Add Calendar icon
+  Calendar as CalendarIcon, // Rename imported icon to avoid conflict
   Frame,
   LifeBuoy,
   Map,
@@ -20,7 +21,9 @@ import Link from "next/link"; // Add Link for buttons
 import { useUser } from "@/hooks/useAuth";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { ModeToggle } from "@/components/navbar/mode-toggle"; // Import ModeToggle
+import { ModeToggle } from "@/components/navbar/mode-toggle";
+import { Calendar } from "@/components/ui/calendar"; // Import the Calendar component
+import { useCalendarStore } from "@/store/calendarStore"; // Import the Zustand store
 
 import { NavMain } from "@/components/sidebar/nav-main";
 import { NavProjects } from "@/components/sidebar/nav-projects";
@@ -30,6 +33,8 @@ import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
+  SidebarGroup, // Import SidebarGroup
+  SidebarGroupLabel, // Import SidebarGroupLabel
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -50,71 +55,71 @@ const navMainData = [
   {
     title: "Calendar",
     url: "/calendar", // Link to calendar page
-    icon: Calendar, // Use Calendar icon
+    icon: CalendarIcon, // Use renamed Calendar icon
   },
   // Keep existing playground/models etc. or remove if not needed
-  {
-    title: "Playground",
-    url: "#",
-    icon: SquareTerminal,
-    // isActive: true, // Remove isActive or manage dynamically
-    items: [
-      {
-        title: "History",
-        url: "#",
-      },
-      {
-        title: "Starred",
-        url: "#",
-      },
-      {
-        title: "Settings",
-        url: "#",
-      },
-    ],
-  },
-  {
-    title: "Models",
-    url: "#",
-    icon: Bot,
-    items: [
-      {
-        title: "Genesis",
-        url: "#",
-      },
-      {
-        title: "Explorer",
-        url: "#",
-      },
-      {
-        title: "Quantum",
-        url: "#",
-      },
-    ],
-  },
-  {
-    title: "Documentation",
-    url: "#",
-    icon: BookOpen,
-    items: [
-      {
-        title: "Introduction",
-        url: "#",
-      },
-      {
-        title: "Get Started",
-        url: "#",
-      },
-      {
-        title: "Tutorials",
-        url: "#",
-      },
-      {
-        title: "Changelog",
-        url: "#",
-      },
-    ],
-  },
+  // {
+  //   title: "Playground",
+  //   url: "#",
+  //   icon: SquareTerminal,
+  //   // isActive: true, // Remove isActive or manage dynamically
+  //   items: [
+  //     {
+  //       title: "History",
+  //       url: "#",
+  //     },
+  //     {
+  //       title: "Starred",
+  //       url: "#",
+  //     },
+  //     {
+  //       title: "Settings",
+  //       url: "#",
+  //     },
+  //   ],
+  // },
+  // {
+  //   title: "Models",
+  //   url: "#",
+  //   icon: Bot,
+  //   items: [
+  //     {
+  //       title: "Genesis",
+  //       url: "#",
+  //     },
+  //     {
+  //       title: "Explorer",
+  //       url: "#",
+  //     },
+  //     {
+  //       title: "Quantum",
+  //       url: "#",
+  //     },
+  //   ],
+  // },
+  // {
+  //   title: "Documentation",
+  //   url: "#",
+  //   icon: BookOpen,
+  //   items: [
+  //     {
+  //       title: "Introduction",
+  //       url: "#",
+  //     },
+  //     {
+  //       title: "Get Started",
+  //       url: "#",
+  //     },
+  //     {
+  //       title: "Tutorials",
+  //       url: "#",
+  //     },
+  //     {
+  //       title: "Changelog",
+  //       url: "#",
+  //     },
+  //   ],
+  // },
   {
     title: "Settings",
     url: "#",
@@ -173,7 +178,26 @@ const projectsData = [
 ];
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const pathname = usePathname(); // Get current path
+  const isCalendarPage = pathname.startsWith("/calendar"); // Check if it's the calendar page
+
   const { data: user, isLoading, isError, error } = useUser(); // Fetch user data
+
+  // Zustand state for shared date
+  const { currentDate, setCurrentDate } = useCalendarStore();
+  // Local state for mini-calendar's displayed month
+  const [miniCalMonth, setMiniCalMonth] = React.useState<Date>(currentDate);
+
+  // Sync mini-calendar month with shared date state
+  React.useEffect(() => {
+    setMiniCalMonth(currentDate);
+  }, [currentDate]);
+
+  // Handle date selection from mini-calendar
+  const handleDateSelect = (date: Date | undefined) => {
+    if (!date) return;
+    setCurrentDate(date); // Update shared state
+  };
 
   // Handle error state - log it for now
   if (isError) {
@@ -207,6 +231,48 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarContent>
         {/* Use defined data variables */}
         <NavMain items={navMainData} />
+
+        {/* Conditionally Render Calendar Nav Section */}
+        {isCalendarPage && (
+          // Add data-[collapsed=true]:hidden to the group itself to hide label too
+          <SidebarGroup className="data-[collapsed=true]:hidden">
+            <SidebarGroupLabel>Date Nav</SidebarGroupLabel>
+            {/* Wrapper to hide calendar when collapsed */}
+            <div className="flex justify-center p-2 data-[collapsed=true]:hidden">
+              <Calendar
+                mode="single"
+                selected={currentDate}
+                onSelect={handleDateSelect}
+                month={miniCalMonth}
+                onMonthChange={setMiniCalMonth}
+                className="rounded-md p-0" // Removed border
+                classNames={{
+                  // Make it more compact
+                  caption_label: "text-xs font-medium", // Smaller caption
+                  nav_button: "h-5 w-5", // Smaller nav buttons
+                  nav_button_previous: "absolute left-1 top-1", // Adjust position
+                  nav_button_next: "absolute right-1 top-1", // Adjust position
+                  table: "w-full border-collapse space-y-1", // Add space between rows
+                  head_row: "flex w-full", // Removed mt-2
+                  head_cell:
+                    "w-full rounded-md text-[0.7rem] font-normal text-muted-foreground", // Smaller header text, adjusted width
+                  row: "flex w-full mt-1", // Smaller margin top
+                  cell: "h-8 w-8 text-center text-xs p-0 relative [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20", // Smaller cell size, smaller text
+                  day: "h-8 w-8 p-0 font-normal aria-selected:opacity-100", // Smaller day size
+                  day_selected:
+                    "rounded-md bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground", // Ensure selected is rounded
+                  day_today: "rounded-md bg-accent text-accent-foreground", // Ensure today is rounded
+                  day_outside: "text-muted-foreground opacity-50",
+                  day_disabled: "text-muted-foreground opacity-50",
+                  day_range_middle:
+                    "aria-selected:bg-accent aria-selected:text-accent-foreground",
+                  day_hidden: "invisible",
+                }}
+              />
+            </div>
+          </SidebarGroup>
+        )}
+
         <NavProjects projects={projectsData} />
         <NavSecondary items={navSecondaryData} className="mt-auto" />
       </SidebarContent>

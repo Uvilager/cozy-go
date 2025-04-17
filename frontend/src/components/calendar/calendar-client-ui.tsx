@@ -11,7 +11,8 @@ import {
   subDays,
   addDays,
 } from "date-fns";
-import Sidebar from "./sidebar";
+// import Sidebar from "./sidebar"; // Remove old sidebar import
+import { useCalendarStore } from "@/store/calendarStore"; // Import Zustand store
 import CalendarHeader, { CalendarView } from "./header";
 import MonthView from "./month-view";
 import WeekView from "./week-view";
@@ -34,9 +35,9 @@ export default function CalendarClientUI({
 }: CalendarClientUIProps) {
   // --- State Management ---
   const [view, setView] = useState<CalendarView>(initialView || "month");
-  const [currentDate, setCurrentDate] = useState<Date>(
-    initialDate || startOfMonth(new Date())
-  );
+  // Get date state from Zustand store
+  const { currentDate, setCurrentDate } = useCalendarStore();
+  // Keep project ID state local for now
   const [selectedProjectId, setSelectedProjectId] = useState<
     number | undefined
   >(initialProjectId);
@@ -51,14 +52,18 @@ export default function CalendarClientUI({
   const handleSetView = (newView: CalendarView) => {
     setView(newView);
     let newReferenceDate = currentDate;
-    if (newView === "month") {
-      newReferenceDate = startOfMonth(currentDate);
-    } else if (newView === "week") {
-      newReferenceDate = startOfWeek(currentDate, { weekStartsOn: 1 });
-    }
-    if (newReferenceDate.getTime() !== currentDate.getTime()) {
-      setCurrentDate(newReferenceDate);
-    }
+    // Use currentDate from store for reference, but don't reset it here
+    // Resetting based on view change might be confusing if user navigated via mini-cal
+    // Let's rely on handleNavigateDate for explicit date changes
+    // let newReferenceDate = currentDate;
+    // if (newView === "month") {
+    //   newReferenceDate = startOfMonth(currentDate);
+    // } else if (newView === "week") {
+    //   newReferenceDate = startOfWeek(currentDate, { weekStartsOn: 1 });
+    // }
+    // if (newReferenceDate.getTime() !== currentDate.getTime()) {
+    //   setCurrentDate(newReferenceDate); // Use store action
+    // }
   };
 
   const handleNavigateDate = (date: Date) => {
@@ -71,7 +76,7 @@ export default function CalendarClientUI({
       // Day view
       newReferenceDate = date;
     }
-    setCurrentDate(newReferenceDate);
+    setCurrentDate(newReferenceDate); // Use store action
   };
 
   const handlePrevious = () => {
@@ -83,7 +88,7 @@ export default function CalendarClientUI({
     } else {
       newDate = subDays(currentDate, 1);
     }
-    setCurrentDate(newDate);
+    setCurrentDate(newDate); // Use store action
   };
 
   const handleNext = () => {
@@ -95,7 +100,7 @@ export default function CalendarClientUI({
     } else {
       newDate = addDays(currentDate, 1);
     }
-    setCurrentDate(newDate);
+    setCurrentDate(newDate); // Use store action
   };
 
   const handleToday = () => {
@@ -155,12 +160,12 @@ export default function CalendarClientUI({
     // This component now renders the full calendar UI including Sidebar
     // The outer div takes the flex properties from the simplified layout.tsx
     <>
-      <Sidebar
+      {/* <Sidebar
         currentDate={currentDate}
         selectedProjectId={selectedProjectId}
         onNavigateDate={handleNavigateDate}
         onProjectChange={handleSetProject}
-      />
+      /> */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {" "}
         {/* Main content area */}
