@@ -1,3 +1,5 @@
+"use client"; // Mark this module as client-side only
+
 import { useMutation, useQuery } from "@tanstack/react-query"; // Add useQuery
 import { useRouter } from "next/navigation"; // For redirection
 import {
