@@ -4,23 +4,26 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strconv" // Import strconv
 
 	"auth-service/internal/events"
+	"auth-service/internal/middleware" // Import middleware
 	"auth-service/internal/models"
 	"auth-service/internal/utils"
 	"auth-service/repository"
 
+	// "github.com/Azure/azure-sdk-for-go/sdk/messaging/azservicebus" // No longer needed directly
 	"github.com/go-playground/validator/v10"
-	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type AuthHandler struct {
-	repo         repository.AuthRepository
-	rabbitMQConn *amqp.Connection
+	repo           repository.AuthRepository
+	eventPublisher events.EventPublisher // Use the EventPublisher interface
 }
 
-func NewAuthHandler(repo repository.AuthRepository, rabbitMQConn *amqp.Connection) *AuthHandler {
-	return &AuthHandler{repo: repo, rabbitMQConn: rabbitMQConn}
+// NewAuthHandler updated to accept an events.EventPublisher
+func NewAuthHandler(repo repository.AuthRepository, publisher events.EventPublisher) *AuthHandler {
+	return &AuthHandler{repo: repo, eventPublisher: publisher}
 }
 
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
@@ -62,6 +65,18 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Publish event after successful registration
+	if h.eventPublisher != nil { // Check if publisher is configured
+		err = h.eventPublisher.PublishUserRegisteredEvent(r.Context(), user.Email)
+		if err != nil {
+			// Log the error but don't fail the registration request
+			log.Printf("Warning: Failed to publish user registered event for email %s: %v", user.Email, err)
+			// Decide if this should be a hard failure or just a warning
+		}
+	} else {
+		log.Println("Warning: Event publisher not configured in handler, skipping event publication for registration.")
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]string{"message": "User registered successfully"}) // Send a success message
@@ -94,20 +109,99 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Generate JWT token
-	token, err := utils.GenerateJWT(user)
+	// Fetch full user details (including ID) after successful authentication
+	dbUser, err := h.repo.GetUserByEmail(r.Context(), req.Email)
+	if err != nil {
+		log.Printf("Failed to retrieve user details after authentication for email %s: %v", req.Email, err)
+		http.Error(w, "Failed to retrieve user details", http.StatusInternalServerError)
+		return
+	}
+	if dbUser == nil {
+		log.Printf("User %s authenticated but not found in database.", req.Email)
+		http.Error(w, "User not found after authentication", http.StatusInternalServerError)
+		return
+	}
+
+	// Generate JWT token using the fetched user details (especially ID)
+	token, err := utils.GenerateJWT(*dbUser)
 	if err != nil {
 		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
 		return
 	}
 
-	// Emit login event to RabbitMQ
-	err = events.PublishLoginEvent(h.rabbitMQConn, user.Email)
-	if err != nil {
-		http.Error(w, "Failed to process login event", http.StatusInternalServerError)
-		return
+	// Emit login event using the EventPublisher interface
+	if h.eventPublisher != nil { // Check if publisher is configured
+		// TODO: Consider creating a specific PublishUserLoggedInEvent method/event type
+		err = h.eventPublisher.PublishUserRegisteredEvent(r.Context(), dbUser.Email) // Using the interface method
+		if err != nil {
+			// Log the error but maybe don't fail the login just because event publishing failed?
+			// Depends on requirements. For now, we'll log and continue.
+			log.Printf("Failed to publish login event for user %s: %v", dbUser.Email, err)
+			// Optionally return error if event publishing is critical
+			// http.Error(w, "Failed to process login event", http.StatusInternalServerError)
+			// return
+		} // <<< Ensure this closing brace is present
+	} else {
+		log.Println("Warning: Event publisher not configured in handler, skipping event publication for login.")
+	}
+
+	// Prepare the response including token and user details
+	responseUser := models.UserResponse{
+		ID:       dbUser.ID,
+		Username: dbUser.Username,
+		Email:    dbUser.Email,
+	}
+	responsePayload := map[string]interface{}{
+		"token": token,
+		"user":  responseUser,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"token": token})
+	w.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(w).Encode(responsePayload); err != nil {
+		log.Printf("Error encoding login response for user %s: %v", dbUser.Email, err)
+	}
+	log.Printf("Successfully handled Login request for user ID: %d", dbUser.ID)
+}
+
+// GetMe handles requests to fetch the current user's details based on JWT.
+func (h *AuthHandler) GetMe(w http.ResponseWriter, r *http.Request) {
+	// Extract userID string from context (set by JWTAuth middleware)
+	userIDStr, ok := r.Context().Value(middleware.UserIDContextKey).(string)
+	if !ok || userIDStr == "" {
+		log.Println("Error: User ID string not found in context or is empty")
+		http.Error(w, "Unauthorized: User ID missing from token context", http.StatusUnauthorized)
+		return
+	}
+
+	// Convert userID string to int
+	userID, err := strconv.Atoi(userIDStr)
+	if err != nil {
+		log.Printf("Error converting userID string '%s' to int: %v", userIDStr, err)
+		http.Error(w, "Unauthorized: Invalid user ID format in token", http.StatusUnauthorized)
+		return
+	}
+
+	// Fetch user details from repository using the ID
+	user, err := h.repo.GetUserByID(r.Context(), userID)
+	if err != nil {
+		log.Printf("Error fetching user details for ID %d: %v", userID, err)
+		http.Error(w, "Failed to retrieve user information", http.StatusInternalServerError)
+		return
+	}
+	if user == nil {
+		// This case should ideally not happen if the token was valid,
+		// but handle it defensively (e.g., user deleted after token issued).
+		log.Printf("User with ID %d from token not found in database", userID)
+		http.Error(w, "Unauthorized: User not found", http.StatusUnauthorized)
+		return
+	}
+
+	// Respond with user details (excluding password)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(w).Encode(user); err != nil {
+		log.Printf("Error encoding GetMe response for user ID %d: %v", userID, err)
+	}
+	log.Printf("Successfully handled GetMe request for user ID: %d", userID)
 }

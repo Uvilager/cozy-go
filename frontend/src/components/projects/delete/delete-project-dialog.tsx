@@ -13,7 +13,6 @@ import {
   AlertDialogTitle,
   // AlertDialogTrigger, // Trigger is handled by parent
 } from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button"; // Needed for AlertDialogAction styling
 import { Project } from "@/lib/api"; // Import Project type
 import { toast } from "sonner"; // For notifications
 
@@ -64,8 +63,8 @@ export function DeleteProjectDialog({
           <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
           <AlertDialogDescription>
             This action cannot be undone. This will permanently delete the
-            project "<strong>{project.name}</strong>" and all of its associated
-            tasks.
+            project &quot;<strong>{project.name}</strong>&quot; and all of its
+            associated tasks.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

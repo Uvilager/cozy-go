@@ -11,5 +11,8 @@ func RegisterRoutes(mux *http.ServeMux, authHandler *handlers.AuthHandler, healt
 	mux.HandleFunc("/register", authHandler.Register)
 	mux.HandleFunc("/login", authHandler.Login)
 	mux.HandleFunc("/health", healthHandler.HealthCheck)
+
+	// Protected routes
 	mux.Handle("/protected", middleware.JWTAuth(http.HandlerFunc(protectedHandler.Protected)))
+	mux.Handle("GET /me", middleware.JWTAuth(http.HandlerFunc(authHandler.GetMe))) // Add GET /me route
 }

@@ -22,8 +22,8 @@ func InitDB() error {
 	dbName := os.Getenv("TASK_DB_NAME")
 
 	// Construct the connection string
-	// Example: "postgres://taskuser:taskpassword@taskdb:5432/taskdb?sslmode=disable"
-	connString := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
+	// Example: "postgres://taskuser:taskpassword@taskdb:5432/taskdb?sslmode=require"
+	connString := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", // Changed sslmode to require for Azure PG
 		dbUser, dbPassword, dbHost, dbPort, dbName)
 
 	// Configure the connection pool

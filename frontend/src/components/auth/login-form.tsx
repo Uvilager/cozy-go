@@ -9,9 +9,10 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import React, { useState } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState } from "react"; // Keep useState for email/password
+// No longer need useRouter here, handled by the hook
 import Link from "next/link";
+import { useLogin } from "@/hooks/useAuth"; // Import the login hook
 
 export function LoginForm({
   className,
@@ -19,49 +20,18 @@ export function LoginForm({
 }: React.ComponentProps<"div">) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-  const router = useRouter();
+  // const [error, setError] = useState(""); // Handled by hook/toast
+  // const [loading, setLoading] = useState(false); // Handled by hook isPending
+  // const router = useRouter(); // Handled by hook
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Use the login mutation hook
+  const { mutate: loginMutate, isPending } = useLogin();
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
-    setLoading(true);
-
-    try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"; // Fallback for local dev if env var not set
-      const response = await fetch(`${apiUrl}/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Login failed");
-      }
-
-      // Login successful
-      console.log("Login successful:", data);
-      if (data.token) {
-        localStorage.setItem("authToken", data.token); // Store token
-        console.log("Token stored in localStorage");
-        router.push("/");
-      } else {
-        setError("Login successful, but no token received.");
-      }
-    } catch (err: unknown) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError("An unexpected error occurred.");
-      }
-    } finally {
-      setLoading(false);
-    }
+    // Call the mutation function from the hook
+    loginMutate({ email, password });
+    // The hook's onSuccess/onError handles state update, toast, and redirect
   };
 
   return (
@@ -76,9 +46,10 @@ export function LoginForm({
         <CardContent>
           <form onSubmit={handleSubmit}>
             <div className="flex flex-col gap-6">
-              {error && (
+              {/* Error display is now handled by toast notifications */}
+              {/* {error && (
                 <p className="text-red-500 text-xs italic mt-2">{error}</p>
-              )}
+              )} */}
               <div className="grid gap-3">
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -88,7 +59,7 @@ export function LoginForm({
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  disabled={loading}
+                  disabled={isPending} // Use isPending from hook
                 />
               </div>
               <div className="grid gap-3">
@@ -107,15 +78,20 @@ export function LoginForm({
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  disabled={loading}
+                  disabled={isPending} // Use isPending from hook
                   placeholder="••••••••"
                 />
               </div>
               <div className="flex flex-col gap-3">
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? "Logging in..." : "Login"}
+                <Button type="submit" className="w-full" disabled={isPending}>
+                  {isPending ? "Logging in..." : "Login"}
                 </Button>
-                <Button variant="outline" className="w-full" disabled={loading}>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  disabled={isPending}
+                >
+                  {/* TODO: Implement Google Login */}
                   Login with Google
                 </Button>
               </div>

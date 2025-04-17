@@ -21,12 +21,22 @@ export type UpdateProjectPayload = Partial<CreateProjectPayload>;
 
 /**
  * Fetches all projects from the API.
+ * @param token Optional auth token for server-side requests.
  * @returns A promise that resolves to an array of projects.
  */
-export const getProjects = async (): Promise<Project[]> => {
+export const getProjects = async (token?: string): Promise<Project[]> => {
   try {
     console.log("API: Fetching projects...");
-    const response = await axiosInstance.get<Project[]>("/projects");
+    // Configure headers based on token presence
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+      console.log("getProjects: Using provided token for server-side request.");
+    } // Client-side calls will rely on the interceptor
+
+    const response = await axiosInstance.get<Project[]>("/projects", {
+      headers,
+    });
 
     // Check for successful status code
     if (response.status !== 200) {
@@ -51,20 +61,28 @@ export const getProjects = async (): Promise<Project[]> => {
 /**
  * Creates a new project.
  * @param projectData The data for the new project (name, description).
+ * @param token Optional auth token for server-side requests (if needed, though creation is usually client-side).
  * @returns A promise that resolves to the newly created project.
  */
 export const createProject = async (
-  projectData: CreateProjectPayload
+  projectData: CreateProjectPayload,
+  token?: string
 ): Promise<Project> => {
   try {
     console.log("API: Creating project...", projectData);
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
     // Ensure description is not sent if empty, matching backend omitempty
     const payload = { ...projectData };
     if (payload.description === "") {
       delete payload.description;
     }
 
-    const response = await axiosInstance.post<Project>("/projects", payload);
+    const response = await axiosInstance.post<Project>("/projects", payload, {
+      headers,
+    });
 
     // Check for successful creation status code (usually 201 Created)
     if (response.status !== 201) {
@@ -91,14 +109,20 @@ export const createProject = async (
  * Updates an existing project.
  * @param projectId The ID of the project to update.
  * @param projectData The data to update the project with.
+ * @param token Optional auth token.
  * @returns A promise that resolves to the updated project.
  */
 export const updateProject = async (
   projectId: number,
-  projectData: UpdateProjectPayload
+  projectData: UpdateProjectPayload,
+  token?: string
 ): Promise<Project> => {
   if (!projectId) {
     throw new Error("Project ID is required to update a project.");
+  }
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
   }
   try {
     console.log(`API: Updating project ${projectId}...`, projectData);
@@ -110,7 +134,8 @@ export const updateProject = async (
 
     const response = await axiosInstance.put<Project>(
       `/projects/${projectId}`,
-      payload
+      payload,
+      { headers }
     );
 
     // Check for successful update status code (usually 200 OK)
@@ -140,15 +165,25 @@ export const updateProject = async (
 /**
  * Deletes a specific project.
  * @param projectId The ID of the project to delete.
+ * @param token Optional auth token.
  * @returns A promise that resolves when the project is deleted.
  */
-export const deleteProject = async (projectId: number): Promise<void> => {
+export const deleteProject = async (
+  projectId: number,
+  token?: string
+): Promise<void> => {
   if (!projectId) {
     throw new Error("Project ID is required to delete a project.");
   }
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
   try {
     console.log(`API: Deleting project ${projectId}...`);
-    const response = await axiosInstance.delete(`/projects/${projectId}`);
+    const response = await axiosInstance.delete(`/projects/${projectId}`, {
+      headers,
+    });
 
     // Check for successful deletion status codes (usually 200 OK or 204 No Content)
     if (response.status !== 200 && response.status !== 204) {

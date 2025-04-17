@@ -9,7 +9,7 @@ type Project struct {
 	Description string    `json:"description,omitempty"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
-	// TODO: Add relation to User (Owner/Creator) if needed later
+	UserID      int       `json:"user_id"` // Added UserID field
 }
 
 // Task represents a single task within a project
@@ -20,8 +20,10 @@ type Task struct {
 	Description string    `json:"description,omitempty"`
 	Status      Status    `json:"status"`    // Use custom Status type
 	Label       Label     `json:"label"`     // Use custom Label type
-	Priority    Priority  `json:"priority"`  // Use custom Priority type
+	Priority    Priority  `json:"priority"`           // Use custom Priority type
 	DueDate     *time.Time `json:"due_date,omitempty"` // Pointer to allow null
+	StartTime   *time.Time `json:"start_time,omitempty"` // Optional start time
+	EndTime     *time.Time `json:"end_time,omitempty"`   // Optional end time
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 	// TODO: Add relation to User (Assignee) if needed later

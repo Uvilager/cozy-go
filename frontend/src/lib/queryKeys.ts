@@ -13,6 +13,9 @@ export const queryKeys = {
   // Example for fetching a single task (add if needed later)
   // task: (taskId: number) => ["task", taskId] as const,
 
+  // Key for fetching the current authenticated user
+  user: ["user"] as const,
+
   // Add other query keys as the application grows
 };
 

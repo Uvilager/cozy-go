@@ -7,11 +7,12 @@ import {
 } from "@tanstack/react-query";
 // Task type might be needed if we handle data directly, but likely not with hooks/api layer
 // import { Task } from "@/components/tasks/data/schema";
-import TaskTableClient from "@/components/tasks/task-table-client";
-import { ProjectPicker } from "@/components/projects/project-picker";
-// Import Project type along with API functions
-import { Project, getProjects, getTasksByProject } from "@/lib/api";
+// import TaskTableClient from "@/components/tasks/task-table-client"; // Rendered by TasksView now
+// import { ProjectPicker } from "@/components/projects/project-picker"; // Rendered by TasksView now
+import TasksView from "@/components/tasks/tasks-view"; // Import the new client component wrapper
+import { getProjects, getTasksByProject } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys"; // Import query keys
+import { cookies } from "next/headers"; // Import cookies function for Server Components
 
 // Removed old fetch functions and Project interface (assuming it's defined/exported elsewhere if needed)
 // API_URL is now handled within the axios instance/API layer
@@ -21,15 +22,24 @@ import { queryKeys } from "@/lib/queryKeys"; // Import query keys
 export default async function TasksPage({
   searchParams,
 }: {
-  searchParams?: { [key: string]: string | string[] | undefined };
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
+  const resolvedSearchParams = await searchParams; // Await the Promise to get the actual searchParams object
   const queryClient = new QueryClient();
+  // Read the auth token from cookies on the server-side
+  // Await cookies() and then get the value
+  const cookieStore = await cookies(); // Await the cookies() function call
+  const token = cookieStore.get("authToken")?.value;
+  console.log(
+    "TasksPage (Server): Read token from cookie - ",
+    token ? "found" : "not found"
+  );
 
-  // Prefetch projects first
+  // Prefetch projects first, passing the token
   try {
     await queryClient.prefetchQuery({
       queryKey: queryKeys.projects,
-      queryFn: getProjects,
+      queryFn: () => getProjects(token), // Pass token here
     });
   } catch (error) {
     console.error("TasksPage: Failed to prefetch projects on server:", error);
@@ -41,7 +51,9 @@ export default async function TasksPage({
 
   // Determine the projectId to use based *only* on URL search params for server prefetch.
   // The client-side ProjectPicker will handle defaulting if the param is missing/invalid.
-  const currentProjectIdParam = searchParams?.projectId as string | undefined;
+  const currentProjectIdParam = resolvedSearchParams.projectId as
+    | string
+    | undefined;
   let projectIdToFetch: number | undefined;
 
   // Try to parse the ID from the URL param. No fallback logic here on the server.
@@ -61,8 +73,8 @@ export default async function TasksPage({
       await queryClient.prefetchQuery({
         // Use the centralized query key
         queryKey: queryKeys.tasks(projectIdToFetch),
-        // Use the new API function
-        queryFn: () => getTasksByProject(projectIdToFetch),
+        // Use the new API function, passing the token
+        queryFn: () => getTasksByProject(projectIdToFetch, token), // Pass token here
       });
     } catch (error) {
       console.error(
@@ -80,34 +92,8 @@ export default async function TasksPage({
     // Pass the dehydrated state to the boundary
     <HydrationBoundary state={dehydratedState}>
       {/* Adjusted padding and removed container for full width header possibility */}
-      <div className="space-y-6 p-10 pb-16 md:block">
-        {/* Header Section with Flexbox */}
-        <div className="flex flex-col space-y-4 md:flex-row md:items-center md:justify-between md:space-y-0">
-          {/* Title and Subtitle */}
-          <div>
-            <h2 className="text-2xl font-bold tracking-tight">Tasks</h2>
-            <p className="text-muted-foreground">
-              Manage your tasks and track your progress.
-            </p>
-          </div>
-          {/* Project Picker on the right */}
-          <div className="flex items-center space-x-2">
-            <ProjectPicker currentProjectId={currentProjectIdParam} />
-            {/* Add other actions here if needed, e.g., Add Task Button */}
-          </div>
-        </div>
-
-        {/* Task Table Section */}
-        {/* Render the Client Component, passing the projectId it should use */}
-        {/* Conditionally render TaskTableClient */}
-        {projectIdToFetch !== undefined ? (
-          <TaskTableClient projectId={projectIdToFetch} />
-        ) : (
-          // Simplified fallback message as we don't have project count here
-          <div>Please select a project to view its tasks.</div>
-        )}
-      </div>
-      {/* Removed closing div for container as it's now handled by the outer div */}
+      {/* Render the TasksView client component, passing the initial ID */}
+      <TasksView initialProjectId={projectIdToFetch} />
     </HydrationBoundary>
   );
 }

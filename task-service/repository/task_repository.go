@@ -14,13 +14,18 @@ import (
 
 // TaskRepository defines the interface for task data operations.
 type TaskRepository interface {
-	CreateTask(ctx context.Context, task *models.Task) (int, error)
-	GetTaskByID(ctx context.Context, id int) (*models.Task, error)
-	GetTasksByProjectID(ctx context.Context, projectID int) ([]models.Task, error)
-	UpdateTask(ctx context.Context, task *models.Task) error // Updated to handle full task update
-	DeleteTask(ctx context.Context, id int) error
-	// UpdateTaskStatus might be deprecated or refactored into UpdateTask
-	UpdateTaskStatus(ctx context.Context, id int, status models.Status) error // Changed status type
+	// CreateTask needs userID to verify project ownership before insert
+	CreateTask(ctx context.Context, task *models.Task, userID int) (int, error)
+	// GetTaskByID needs userID to verify ownership
+	GetTaskByID(ctx context.Context, id int, userID int) (*models.Task, error)
+	// GetTasksByProjectID needs userID to verify ownership of the project
+	GetTasksByProjectID(ctx context.Context, projectID int, userID int) ([]models.Task, error)
+	// UpdateTask needs userID to verify ownership
+	UpdateTask(ctx context.Context, task *models.Task, userID int) error
+	// DeleteTask needs userID to verify ownership
+	DeleteTask(ctx context.Context, id int, userID int) error
+	// UpdateTaskStatus needs userID to verify ownership
+	UpdateTaskStatus(ctx context.Context, id int, status models.Status, userID int) error
 }
 
 // pgTaskRepository implements TaskRepository using pgxpool.
@@ -36,10 +41,35 @@ func NewTaskRepository() TaskRepository {
 	return &pgTaskRepository{db: database.DB}
 }
 
-// CreateTask inserts a new task into the database.
-func (r *pgTaskRepository) CreateTask(ctx context.Context, task *models.Task) (int, error) {
-	query := `INSERT INTO tasks (project_id, title, description, status, label, priority, due_date, created_at, updated_at)
-              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+// checkProjectOwnership verifies if a project belongs to a specific user.
+// Returns pgx.ErrNoRows if not found/owned, other errors on DB issues.
+func (r *pgTaskRepository) checkProjectOwnership(ctx context.Context, projectID int, userID int) error {
+	var exists bool
+	checkQuery := `SELECT EXISTS(SELECT 1 FROM projects WHERE id = $1 AND user_id = $2)`
+	err := r.db.QueryRow(ctx, checkQuery, projectID, userID).Scan(&exists)
+	if err != nil { // Handle potential DB errors during the check
+		log.Printf("Error checking project ownership for project %d, user %d: %v", projectID, userID, err)
+		return err
+	}
+	if !exists {
+		log.Printf("Ownership check failed: Project %d not found or not owned by user %d", projectID, userID)
+		return pgx.ErrNoRows // Use ErrNoRows to indicate not found or not authorized
+	}
+	return nil // Ownership verified
+}
+
+
+// CreateTask inserts a new task into the database after verifying project ownership.
+func (r *pgTaskRepository) CreateTask(ctx context.Context, task *models.Task, userID int) (int, error) {
+	// 1. Verify ownership of the project first
+	if err := r.checkProjectOwnership(ctx, task.ProjectID, userID); err != nil {
+		// If ownership check fails (ErrNoRows or other DB error), return error
+		return 0, err
+	}
+
+	// 2. Proceed with task insertion if ownership is verified
+	query := `INSERT INTO tasks (project_id, title, description, status, label, priority, due_date, start_time, end_time, created_at, updated_at)
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
               RETURNING id, created_at, updated_at`
 	now := time.Now()
 	// Ensure default values if empty
@@ -54,24 +84,31 @@ func (r *pgTaskRepository) CreateTask(ctx context.Context, task *models.Task) (i
 		task.Priority = models.PriorityMedium // Default to medium priority
 	}
 
+	// Remove the duplicated line below
+	// err := r.db.QueryRow(ctx, query,
+	// 	task.ProjectID, task.Title, task.Description, string(task.Status), string(task.Label), string(task.Priority), task.DueDate, now, now,
+	// 	task.Priority = models.PriorityMedium // Default to medium priority
+	// }
+
 	err := r.db.QueryRow(ctx, query,
-		task.ProjectID, task.Title, task.Description, string(task.Status), string(task.Label), string(task.Priority), task.DueDate, now, now, // Cast Status, Label, Priority
+		task.ProjectID, task.Title, task.Description, string(task.Status), string(task.Label), string(task.Priority), task.DueDate, task.StartTime, task.EndTime, now, now,
 	).Scan(&task.ID, &task.CreatedAt, &task.UpdatedAt)
 	if err != nil {
-		log.Printf("Error creating task: %v", err)
+		log.Printf("Error creating task for project %d, user %d: %v", task.ProjectID, userID, err)
 		return 0, err
 	}
 	log.Printf("Created task with ID: %d for project ID: %d", task.ID, task.ProjectID)
 	return task.ID, nil
 }
 
-// GetTaskByID retrieves a task by its ID.
-func (r *pgTaskRepository) GetTaskByID(ctx context.Context, id int) (*models.Task, error) {
-	query := `SELECT id, project_id, title, description, status, label, priority, due_date, created_at, updated_at
-              FROM tasks
-              WHERE id = $1`
+// GetTaskByID retrieves a task by its ID, ensuring it belongs to the given user via the project.
+func (r *pgTaskRepository) GetTaskByID(ctx context.Context, id int, userID int) (*models.Task, error) {
+	query := `SELECT t.id, t.project_id, t.title, t.description, t.status, t.label, t.priority, t.due_date, t.start_time, t.end_time, t.created_at, t.updated_at
+              FROM tasks t
+              JOIN projects p ON t.project_id = p.id
+              WHERE t.id = $1 AND p.user_id = $2` // Check task ID and project ownership
 	task := &models.Task{}
-	err := r.db.QueryRow(ctx, query, id).Scan(
+	err := r.db.QueryRow(ctx, query, id, userID).Scan(
 		&task.ID,
 		&task.ProjectID,
 		&task.Title,
@@ -80,22 +117,36 @@ func (r *pgTaskRepository) GetTaskByID(ctx context.Context, id int) (*models.Tas
 		&task.Label,
 		&task.Priority,
 		&task.DueDate,
+		&task.StartTime, // Scan StartTime
+		&task.EndTime,   // Scan EndTime
 		&task.CreatedAt,
 		&task.UpdatedAt,
 	)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			return nil, nil // Not found
+			log.Printf("Task %d not found or not owned by user %d", id, userID)
+			return nil, nil // Not found or not authorized
 		}
-		log.Printf("Error getting task by ID %d: %v", id, err)
+		log.Printf("Error getting task by ID %d for user %d: %v", id, userID, err)
 		return nil, err
 	}
 	return task, nil
 }
 
-// GetTasksByProjectID retrieves all tasks for a given project ID.
-func (r *pgTaskRepository) GetTasksByProjectID(ctx context.Context, projectID int) ([]models.Task, error) {
-	query := `SELECT id, project_id, title, description, status, label, priority, due_date, created_at, updated_at
+// GetTasksByProjectID retrieves all tasks for a given project ID, ensuring the user owns the project.
+func (r *pgTaskRepository) GetTasksByProjectID(ctx context.Context, projectID int, userID int) ([]models.Task, error) {
+	// 1. Verify ownership of the project first
+	if err := r.checkProjectOwnership(ctx, projectID, userID); err != nil {
+		// If ownership check fails (ErrNoRows or other DB error), return error
+		// Return empty slice and no error if ErrNoRows, or the actual error otherwise
+		if err == pgx.ErrNoRows {
+			return []models.Task{}, nil // Return empty slice if project not found/owned
+		}
+		return nil, err
+	}
+
+	// 2. Proceed with fetching tasks if ownership is verified
+	query := `SELECT id, project_id, title, description, status, label, priority, due_date, start_time, end_time, created_at, updated_at
               FROM tasks
               WHERE project_id = $1
               ORDER BY created_at DESC` // Example ordering
@@ -119,6 +170,8 @@ func (r *pgTaskRepository) GetTasksByProjectID(ctx context.Context, projectID in
 			&task.Label,
 			&task.Priority,
 			&task.DueDate,
+			&task.StartTime, // Scan StartTime
+			&task.EndTime,   // Scan EndTime
 			&task.CreatedAt,
 			&task.UpdatedAt,
 		)
@@ -137,19 +190,24 @@ func (r *pgTaskRepository) GetTasksByProjectID(ctx context.Context, projectID in
 	return tasks, nil
 }
 
-// UpdateTask updates an existing task in the database.
-// Note: This updates all fields provided in the task struct.
-func (r *pgTaskRepository) UpdateTask(ctx context.Context, task *models.Task) error {
+// UpdateTask updates an existing task after verifying project ownership.
+func (r *pgTaskRepository) UpdateTask(ctx context.Context, task *models.Task, userID int) error {
+	// 1. Verify ownership of the project the task belongs to
+	if err := r.checkProjectOwnership(ctx, task.ProjectID, userID); err != nil {
+		return err // Return ErrNoRows or DB error
+	}
+
+	// 2. Proceed with update if ownership is verified
 	query := `UPDATE tasks
-              SET title = $1, description = $2, status = $3, label = $4, priority = $5, due_date = $6, updated_at = $7
-              WHERE id = $8 AND project_id = $9` // Ensure project_id matches for safety? Or just use id?
+              SET title = $1, description = $2, status = $3, label = $4, priority = $5, due_date = $6, start_time = $7, end_time = $8, updated_at = $9
+              WHERE id = $10` // Only need task ID here, ownership checked via project
 	now := time.Now()
 	commandTag, err := r.db.Exec(ctx, query,
-		task.Title, task.Description, string(task.Status), string(task.Label), string(task.Priority), task.DueDate, now, // Cast Status, Label, Priority
-		task.ID, task.ProjectID, // Pass ID and ProjectID for the WHERE clause
+		task.Title, task.Description, string(task.Status), string(task.Label), string(task.Priority), task.DueDate, task.StartTime, task.EndTime, now,
+		task.ID,
 	)
 	if err != nil {
-		log.Printf("Error updating task ID %d: %v", task.ID, err)
+		log.Printf("Error updating task ID %d for user %d: %v", task.ID, userID, err)
 		return err
 	}
 	if commandTag.RowsAffected() == 0 {
@@ -160,12 +218,32 @@ func (r *pgTaskRepository) UpdateTask(ctx context.Context, task *models.Task) er
 	return nil
 }
 
-// DeleteTask removes a task from the database.
-func (r *pgTaskRepository) DeleteTask(ctx context.Context, id int) error {
+// DeleteTask removes a task from the database after verifying ownership via the project.
+func (r *pgTaskRepository) DeleteTask(ctx context.Context, id int, userID int) error {
+	// 1. Get the project ID associated with the task to check ownership
+	var projectID int
+	projectIDQuery := `SELECT project_id FROM tasks WHERE id = $1`
+	err := r.db.QueryRow(ctx, projectIDQuery, id).Scan(&projectID)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			log.Printf("Task %d not found for deletion check", id)
+			return pgx.ErrNoRows // Task doesn't exist
+		}
+		log.Printf("Error fetching project_id for task %d: %v", id, err)
+		return err // Other DB error
+	}
+
+	// 2. Verify ownership of the project
+	if err := r.checkProjectOwnership(ctx, projectID, userID); err != nil {
+		// Return ErrNoRows if not found/owned, or other DB error
+		return err
+	}
+
+	// 3. Proceed with deletion if ownership is verified
 	query := `DELETE FROM tasks WHERE id = $1`
 	commandTag, err := r.db.Exec(ctx, query, id)
 	if err != nil {
-		log.Printf("Error deleting task ID %d: %v", id, err)
+		log.Printf("Error deleting task ID %d for user %d: %v", id, userID, err)
 		return err
 	}
 	if commandTag.RowsAffected() == 0 {
@@ -177,13 +255,33 @@ func (r *pgTaskRepository) DeleteTask(ctx context.Context, id int) error {
 }
 
 
-// UpdateTaskStatus updates only the status of a specific task. Consider deprecating in favor of UpdateTask.
-func (r *pgTaskRepository) UpdateTaskStatus(ctx context.Context, id int, status models.Status) error { // Changed status type
+// UpdateTaskStatus updates only the status of a specific task after verifying ownership.
+func (r *pgTaskRepository) UpdateTaskStatus(ctx context.Context, id int, status models.Status, userID int) error {
+	// 1. Get the project ID associated with the task to check ownership
+	var projectID int
+	projectIDQuery := `SELECT project_id FROM tasks WHERE id = $1`
+	err := r.db.QueryRow(ctx, projectIDQuery, id).Scan(&projectID)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			log.Printf("Task %d not found for status update check", id)
+			return pgx.ErrNoRows // Task doesn't exist
+		}
+		log.Printf("Error fetching project_id for task %d: %v", id, err)
+		return err // Other DB error
+	}
+
+	// 2. Verify ownership of the project
+	if err := r.checkProjectOwnership(ctx, projectID, userID); err != nil {
+		// Return ErrNoRows if not found/owned, or other DB error
+		return err
+	}
+
+	// 3. Proceed with status update if ownership is verified
 	query := `UPDATE tasks SET status = $1, updated_at = $2 WHERE id = $3`
 	now := time.Now()
-	commandTag, err := r.db.Exec(ctx, query, string(status), now, id) // Cast Status to string
+	commandTag, err := r.db.Exec(ctx, query, string(status), now, id)
 	if err != nil {
-		log.Printf("Error updating status for task ID %d: %v", id, err)
+		log.Printf("Error updating status for task ID %d for user %d: %v", id, userID, err)
 		return err
 	}
 	if commandTag.RowsAffected() == 0 {

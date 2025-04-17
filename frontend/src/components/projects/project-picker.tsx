@@ -1,9 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useQueryClient } from "@tanstack/react-query"; // Import useQueryClient
+import { useState, useEffect, useMemo } from "react";
 // Import useMutation if/when create project functionality is added
 // import { useMutation } from "@tanstack/react-query";
 
@@ -36,7 +34,6 @@ import { useProjects } from "@/hooks/useProjects";
 import { Project } from "@/lib/api"; // Assuming Project type is here
 // Import createProject API function when available
 // import { createProject } from "@/lib/api";
-import { queryKeys } from "@/lib/queryKeys";
 import { AddProjectDialog } from "./add/add-project-dialog"; // Import the new dialog component
 import { EditProjectDialog } from "./edit/edit-project-dialog"; // Import Edit Dialog
 import { DeleteProjectDialog } from "./delete/delete-project-dialog"; // Import Delete Dialog
@@ -48,13 +45,17 @@ import {
 } from "@/components/ui/dropdown-menu"; // Import Dropdown components
 
 interface ProjectPickerProps {
-  currentProjectId: string | undefined; // Project ID from URL params
+  currentProjectId: string | undefined; // Project ID from URL params (or parent state)
+  onProjectChange: (projectId: string | undefined) => void; // Callback when project changes
 }
 
-export function ProjectPicker({ currentProjectId }: ProjectPickerProps) {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const queryClient = useQueryClient(); // Get query client instance
+export function ProjectPicker({
+  currentProjectId,
+  onProjectChange,
+}: ProjectPickerProps) {
+  // Destructure the new prop
+  // const router = useRouter(); // No longer needed for URL update here
+  // const searchParams = useSearchParams(); // No longer needed for URL update here
 
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -67,52 +68,45 @@ export function ProjectPicker({ currentProjectId }: ProjectPickerProps) {
 
   // Fetch projects using the hook
   const { data: projectsData, isLoading, isError, error } = useProjects();
-  const projects = projectsData ?? [];
+  const projects = useMemo(() => projectsData ?? [], [projectsData]);
 
   // --- TODO: Implement Project Creation Mutation ---
-  // const createProjectMutation = useMutation({
-  //   mutationFn: createProject, // Replace with your actual API call
-  //   onSuccess: (newProject) => {
-  //     queryClient.invalidateQueries({ queryKey: queryKeys.projects }); // Refetch projects
-  //     handleProjectSelect(newProject.id.toString()); // Select the new project
-  //     setCreateDialogOpen(false); // Close dialog
-  //   },
-  //   onError: (error) => {
-  //     console.error("Failed to create project:", error);
-  //     // Handle error display to user, e.g., using a toast notification
-  //   },
-  // });
+  // ... (mutation logic remains the same) ...
 
-  // Determine the selected project based on URL param or default to first project
+  // Determine the selected project based on currentProjectId prop
   useEffect(() => {
     if (projects.length > 0) {
-      const projectFromUrl = currentProjectId
+      const projectFromProp = currentProjectId
         ? projects.find((p) => p.id.toString() === currentProjectId)
         : undefined;
-      setSelectedProject(projectFromUrl || projects[0]);
+      // If prop ID is invalid or missing, default to first project (parent will handle URL update)
+      setSelectedProject(projectFromProp || projects[0]);
+      // If the prop was undefined/invalid and we defaulted, call onProjectChange
+      if (!projectFromProp && projects.length > 0) {
+        console.log(
+          "ProjectPicker: No valid initial project ID, defaulting to first project and notifying parent."
+        );
+        onProjectChange(projects[0].id.toString());
+      }
     } else {
       setSelectedProject(null);
+      // If there are no projects, notify parent (might already be undefined)
+      if (currentProjectId !== undefined) {
+        onProjectChange(undefined);
+      }
     }
-  }, [currentProjectId, projects]);
+    // Depend only on currentProjectId prop and the fetched projects list
+  }, [currentProjectId, projects, onProjectChange]);
 
-  // Update URL search params when a project is selected
+  // Call the parent's handler when a project is selected
   const handleProjectSelect = (projectId: string) => {
     const project = projects.find((p) => p.id.toString() === projectId);
     if (project) {
-      setSelectedProject(project); // Update local state
-
-      const current = new URLSearchParams(Array.from(searchParams.entries()));
-      current.set("projectId", projectId);
-      const search = current.toString();
-      const query = search ? `?${search}` : "";
-      router.push(`/tasks${query}`); // Navigate to update server component data
-
+      // Call the callback function passed from the parent
+      onProjectChange(projectId);
       setPopoverOpen(false); // Close the popover
     }
   };
-
-  // // Handle form submission for creating a new project - REMOVED (now in AddProjectForm)
-  // const handleCreateProjectSubmit = ...
 
   // Loading and Error States
   if (isLoading) {
@@ -298,10 +292,9 @@ export function ProjectPicker({ currentProjectId }: ProjectPickerProps) {
             if (remainingProjects.length > 0) {
               handleProjectSelect(remainingProjects[0].id.toString());
             } else {
-              // Handle case where no projects are left - maybe navigate away or show message
+              // Handle case where no projects are left
               setSelectedProject(null);
-              // Force page reload or navigate to clear tasks if needed
-              router.push("/tasks"); // Navigate to tasks page without project id
+              onProjectChange(undefined); // Notify parent
             }
           }
         }}

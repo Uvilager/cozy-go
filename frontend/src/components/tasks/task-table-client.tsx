@@ -4,7 +4,6 @@ import React from "react";
 // Removed useQuery import as it's now in the hook
 import { columns } from "@/components/tasks/table/columns"; // Adjusted path based on file structure
 import { DataTable } from "@/components/tasks/table/data-table"; // Adjusted path based on file structure
-import { Task } from "@/components/tasks/data/schema";
 import { useTasksByProject } from "@/hooks/useTasks"; // Import the custom hook
 
 // Removed duplicated fetchTasks and API_URL

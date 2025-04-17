@@ -1,33 +1,25 @@
 package events
 
 import (
-	"log"
-
-	amqp "github.com/rabbitmq/amqp091-go"
+	"context"
+	// Removed unused imports: "encoding/json", "fmt", "log", "os"
+	// Removed unused import: "github.com/Azure/azure-sdk-for-go/sdk/messaging/azservicebus"
 )
 
-func PublishLoginEvent(conn *amqp.Connection, username string) error {
-	ch, err := conn.Channel()
-	if err != nil {
-		log.Printf("Failed to open a channel: %v", err)
-		return err
-	}
-	defer ch.Close()
-
-	err = ch.Publish(
-		"",             // exchange
-		"login_events", // routing key
-		false,          // mandatory
-		false,          // immediate
-		amqp.Publishing{
-			ContentType: "text/plain",
-			Body:        []byte(username + " logged in"),
-		})
-	if err != nil {
-		log.Printf("Failed to publish a message: %v", err)
-		return err
-	}
-
-	log.Printf(" [x] Sent %s\n", username+" logged in")
-	return nil
+// EventPublisher defines the interface for publishing events.
+type EventPublisher interface {
+	PublishUserRegisteredEvent(ctx context.Context, userEmail string) error
 }
+
+// Event structure (example, adjust as needed)
+// Keep this shared definition here or move to a models package if preferred
+type UserRegisteredEvent struct {
+	Email string `json:"email"`
+	// Add other relevant fields, e.g., UserID, Timestamp
+}
+
+// NOTE: serviceBusPublisher struct, NewServiceBusPublisher function,
+// PublishUserRegisteredEvent method for serviceBusPublisher,
+// and NewEventPublisherFromEnv factory function have been moved
+// to servicebus.go and factory.go respectively.
+// The Ptr helper function was moved to servicebus.go as it was specific to it.

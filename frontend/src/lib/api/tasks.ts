@@ -8,6 +8,9 @@ export interface CreateTaskPayload {
   priority?: string;
   label?: string;
   description?: string;
+  due_date?: string | null; // ISO string or null
+  start_time?: string | null; // ISO string or null
+  end_time?: string | null; // ISO string or null
 }
 
 // Define the type for the data needed to update a task
@@ -17,16 +20,26 @@ export type UpdateTaskPayload = Partial<
 
 /**
  * Fetches tasks for a specific project ID from the API.
+ * @param projectId The ID of the project.
+ * @param token Optional auth token for server-side requests.
  */
-export const getTasksByProject = async (projectId: number): Promise<Task[]> => {
+export const getTasksByProject = async (
+  projectId: number,
+  token?: string
+): Promise<Task[]> => {
   if (!projectId) {
     console.warn("API: getTasksByProject called without projectId.");
     return [];
   }
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
   try {
     console.log(`API: Fetching tasks for project ${projectId}...`);
     const response = await axiosInstance.get<Task[]>(
-      `/projects/${projectId}/tasks`
+      `/projects/${projectId}/tasks`,
+      { headers }
     );
 
     // Check for successful status code
@@ -52,23 +65,35 @@ export const getTasksByProject = async (projectId: number): Promise<Task[]> => {
 
 /**
  * Creates a new task for a specific project ID.
+ * @param projectId The ID of the project.
+ * @param taskData The data for the new task.
+ * @param token Optional auth token.
  */
 export const createTask = async (
   projectId: number,
-  taskData: CreateTaskPayload
+  taskData: CreateTaskPayload,
+  token?: string
 ): Promise<Task> => {
   if (!projectId) {
     throw new Error("Project ID is required to create a task.");
   }
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
   try {
     console.log(`API: Creating task for project ${projectId}...`, taskData);
     const payload: Partial<CreateTaskPayload> = { ...taskData };
+    // Remove empty optional fields from payload before sending
     if (payload.description === "") delete payload.description;
     if (payload.label === "") delete payload.label;
+    if (payload.priority === "") delete payload.priority; // Assuming empty means not set
+    // Null values for dates/times should be preserved if explicitly set to null
 
     const response = await axiosInstance.post<Task>(
       `/projects/${projectId}/tasks`,
-      payload
+      payload,
+      { headers }
     );
 
     // Check for successful creation status code
@@ -99,18 +124,25 @@ export const createTask = async (
 
 /**
  * Deletes a specific task.
+ * @param taskId The ID of the task to delete.
+ * @param token Optional auth token.
  */
 export const deleteTask = async (
-  // projectId is not needed for the API call itself, but might be useful contextually if needed later
-  // projectId: number,
-  taskId: number
+  taskId: number,
+  token?: string
 ): Promise<void> => {
   if (!taskId) {
     throw new Error("Task ID is required to delete a task.");
   }
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
   try {
     console.log(`API: Deleting task ${taskId}...`);
-    const response = await axiosInstance.delete(`/tasks/${taskId}`);
+    const response = await axiosInstance.delete(`/tasks/${taskId}`, {
+      headers,
+    });
     // Check for successful deletion status codes
     if (response.status !== 200 && response.status !== 204) {
       // 200 OK or 204 No Content are typical for successful DELETE
@@ -133,14 +165,23 @@ export const deleteTask = async (
 
 /**
  * Updates an existing task.
+ * @param projectId The ID of the project the task belongs to.
+ * @param taskId The ID of the task to update.
+ * @param taskData The data to update the task with.
+ * @param token Optional auth token.
  */
 export const updateTask = async (
   projectId: number,
   taskId: number,
-  taskData: UpdateTaskPayload
+  taskData: UpdateTaskPayload,
+  token?: string
 ): Promise<Task> => {
   if (!projectId || !taskId) {
     throw new Error("Project ID and Task ID are required to update a task.");
+  }
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
   }
   try {
     console.log(
@@ -149,7 +190,8 @@ export const updateTask = async (
     );
     const response = await axiosInstance.put<Task>(
       `/projects/${projectId}/tasks/${taskId}`,
-      taskData
+      taskData,
+      { headers }
     );
 
     // Check for successful update status code

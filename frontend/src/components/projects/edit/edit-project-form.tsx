@@ -81,7 +81,7 @@ export function EditProjectForm({
       <DialogHeader>
         <DialogTitle>Edit Project</DialogTitle>
         <DialogDescription>
-          Update the details for "{project.name}".
+          Update the details for &quot;{project.name}&quot;.
         </DialogDescription>
       </DialogHeader>
       <div className="grid gap-4 py-4">
