@@ -16,7 +16,7 @@ interface AddEventDialogProps {
   onOpenChange: (open: boolean) => void; // For closing via overlay/esc
   onClose: () => void; // Explicit close function
   defaultDate?: Date; // Optional date to pre-fill
-  projectId?: number | undefined; // Add projectId prop
+  projectIds: number[]; // Changed from projectId to projectIds array (filter context)
 }
 
 export default function AddEventDialog({
@@ -24,7 +24,7 @@ export default function AddEventDialog({
   onOpenChange,
   onClose,
   defaultDate,
-  projectId, // Destructure projectId
+  projectIds, // Use projectIds prop
 }: AddEventDialogProps) {
   const handleSuccess = () => {
     onClose(); // Call the passed onClose function
@@ -42,10 +42,11 @@ export default function AddEventDialog({
           </DialogDescription>
         </DialogHeader>
         {/* Render the form component, passing defaultDate and projectId */}
+        {/* Render the form component, passing defaultDate and projectIds */}
         <AddEventForm
           onSuccess={handleSuccess}
           defaultDate={defaultDate}
-          projectId={projectId}
+          projectIds={projectIds} // Pass the array
         />
         {/* DialogFooter can be used if the form doesn't have its own submit button */}
         {/* <DialogFooter>

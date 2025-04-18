@@ -10,7 +10,9 @@ import {
   addWeeks,
   subDays,
   addDays,
+  // addDays, // Removed duplicate
 } from "date-fns";
+import { useSearchParams } from "next/navigation"; // Import useSearchParams
 // import Sidebar from "./sidebar"; // Remove old sidebar import
 import { useCalendarStore } from "@/store/calendarStore"; // Import Zustand store
 import CalendarHeader, { CalendarView } from "./header";
@@ -21,26 +23,30 @@ import AddEventDialog from "./add/add-event-dialog";
 
 interface CalendarClientUIProps {
   // Initial props passed from the server component (page.tsx)
-  initialDate?: Date;
+  initialDate?: Date; // Keep initialDate if needed for first load before store hydrates
   initialView?: CalendarView;
-  initialProjectId?: number;
-  // Pass prefetched projects if needed by ProjectPicker directly
-  // initialProjects?: Project[];
+  // Remove initialProjectId
+  // initialProjectId?: number;
 }
 
+// Helper to parse project IDs from URL param (copied from MultiProjectSelector)
+const parseProjectIds = (param: string | null): number[] => {
+  if (!param) return [];
+  return param.split(",").map(Number).filter(Boolean); // Filter out NaN/0 if parsing fails
+};
+
 export default function CalendarClientUI({
-  initialDate,
+  initialDate, // Can be removed if store hydration is reliable enough
   initialView,
-  initialProjectId,
-}: CalendarClientUIProps) {
+}: // initialProjectId, // Removed
+CalendarClientUIProps) {
   // --- State Management ---
   const [view, setView] = useState<CalendarView>(initialView || "month");
   // Get date state from Zustand store
   const { currentDate, setCurrentDate } = useCalendarStore();
-  // Keep project ID state local for now
-  const [selectedProjectId, setSelectedProjectId] = useState<
-    number | undefined
-  >(initialProjectId);
+  // Get project IDs from URL search params
+  const searchParams = useSearchParams();
+  const selectedProjectIdsArray = parseProjectIds(searchParams.get("projects"));
 
   // State for the Add Event Dialog
   const [isAddEventDialogOpen, setIsAddEventDialogOpen] = useState(false);
@@ -107,11 +113,8 @@ export default function CalendarClientUI({
     handleNavigateDate(new Date());
   };
 
-  const handleSetProject = (id: number | undefined) => {
-    console.log("CalendarClientUI: Project selected:", id);
-    setSelectedProjectId(id);
-    // TODO: Update URL if desired?
-  };
+  // Remove handleSetProject as project state is now driven by URL via MultiProjectSelector
+  // const handleSetProject = (id: number | undefined) => { ... };
 
   // --- Add Event Dialog Handlers ---
   const handleOpenAddDialog = (date?: Date) => {
@@ -132,7 +135,7 @@ export default function CalendarClientUI({
           <MonthView
             currentDate={currentDate}
             onDayClick={handleOpenAddDialog}
-            projectId={selectedProjectId}
+            projectIds={selectedProjectIdsArray} // Pass array
           />
         );
       case "week":
@@ -140,7 +143,7 @@ export default function CalendarClientUI({
           <WeekView
             currentDate={currentDate}
             onTimeSlotClick={handleOpenAddDialog}
-            projectId={selectedProjectId}
+            projectIds={selectedProjectIdsArray} // Pass array
           />
         );
       case "day":
@@ -148,7 +151,7 @@ export default function CalendarClientUI({
           <DayView
             currentDate={currentDate}
             onTimeSlotClick={handleOpenAddDialog}
-            projectId={selectedProjectId}
+            projectIds={selectedProjectIdsArray} // Pass array
           />
         );
       default:
@@ -188,7 +191,7 @@ export default function CalendarClientUI({
         onOpenChange={setIsAddEventDialogOpen}
         onClose={handleCloseAddDialog}
         defaultDate={selectedDateForNewEvent}
-        projectId={selectedProjectId} // Pass project ID to the Add dialog/form
+        projectIds={selectedProjectIdsArray} // Pass array - Dialog needs to handle multi-select context
       />
     </>
   );

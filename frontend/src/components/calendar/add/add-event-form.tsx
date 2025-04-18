@@ -58,16 +58,23 @@ const combineDateAndTime = (
 interface AddEventFormProps {
   onSuccess: () => void; // Callback to close dialog on success
   defaultDate?: Date; // Optional date to pre-fill
-  projectId?: number | undefined; // Add projectId prop
+  projectIds: number[]; // Changed from projectId to projectIds array (filter context)
 }
 
 export default function AddEventForm({
   onSuccess,
   defaultDate,
-  projectId, // Destructure projectId
+  projectIds, // Use projectIds prop
 }: AddEventFormProps) {
-  const createTaskMutation = useCreateTask(projectId, {
-    // Use projectId prop
+  // Determine if a single project is pre-selected by the filter
+  const singleProjectId = projectIds.length === 1 ? projectIds[0] : undefined;
+
+  // TODO: If singleProjectId is undefined, the form should ideally render a
+  // mandatory project selector dropdown. For now, useCreateTask might default
+  // or error, and submission logic below handles it partially.
+
+  const createTaskMutation = useCreateTask(singleProjectId, {
+    // Pass the determined single project ID (or undefined)
     // Pass the onSuccess callback from props to the hook's options
     onSuccess: onSuccess,
     // onError is handled internally by the hook (shows toast), but could add more here if needed
@@ -106,8 +113,10 @@ export default function AddEventForm({
         combineDateAndTime(values.dueDate, values.endTime)?.toISOString() ??
         null,
       // Map other fields...
-      // Use the projectId from props
-      project_id: projectId ?? 0, // Send 0 or handle error if projectId is undefined
+      // Use the determined single project ID.
+      // TODO: If singleProjectId is undefined, this should ideally come from
+      // a mandatory project selector field within this form.
+      project_id: singleProjectId ?? 0, // Sending 0 might cause backend error if no project selected
       label: "", // TODO: Add Label selector
       priority: "medium", // TODO: Add Priority selector
       status: "todo",
@@ -124,14 +133,19 @@ export default function AddEventForm({
         // TODO: Show user-friendly error message
       },
     });
-    // Add a check before mutating if projectId is truly required
-    if (projectId === undefined) {
-      console.error("Cannot submit task without a project ID");
+
+    // Add a check before mutating if a project ID is required and wasn't determined
+    // TODO: This check should be more robust if a project selector is added.
+    if (singleProjectId === undefined) {
+      console.error(
+        "Cannot submit task without a project ID (or multiple projects selected in filter)"
+      );
       // Optionally show a toast error to the user
-      // toast.error("Please select a project first.");
+      // toast.error("Please select a project for the task.");
       return; // Prevent submission
     }
-    createTaskMutation.mutate(apiPayload); // Removed the second options object here
+
+    createTaskMutation.mutate(apiPayload);
   }
 
   return (
@@ -220,6 +234,10 @@ export default function AddEventForm({
             )}
           />
         </div>
+
+        {/* TODO: Conditionally render a Project Selector FormField here */}
+        {/* if singleProjectId is undefined */}
+        {/* <FormField control={form.control} name="projectId" render={...} /> */}
 
         <FormField
           control={form.control}

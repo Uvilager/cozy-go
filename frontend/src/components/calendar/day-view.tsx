@@ -15,19 +15,28 @@ import TaskDetailDialog from "./task-detail-dialog";
 interface DayViewProps {
   currentDate: Date; // The specific day to display
   onTimeSlotClick?: (date: Date) => void; // Callback for clicking an empty slot
-  projectId?: number | undefined; // Add projectId prop
+  projectIds: number[]; // Add projectId prop
 }
 
 export default function DayView({
   currentDate,
   onTimeSlotClick,
-  projectId, // Destructure projectId
+  projectIds, // Destructure projectId
 }: DayViewProps) {
   // --- State & Data Fetching ---
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  // --- Data Fetching ---
+  // Use the projectIds array passed from props
+  // TODO: Update useTasksByProject hook to accept number[] and filter correctly.
+  // Temporary workaround: Pass single ID if exactly one is selected, otherwise undefined.
+  const projectIdForHook = projectIds.length === 1 ? projectIds[0] : undefined;
   // Use the projectId passed from props
-  const { data: allTasks, isLoading, error } = useTasksByProject(projectId);
+  const {
+    data: allTasks,
+    isLoading,
+    error,
+  } = useTasksByProject(projectIdForHook);
 
   // --- Calendar Calculations ---
   const hours = Array.from({ length: 24 }, (_, i) => i); // 0 to 23
@@ -219,7 +228,7 @@ export default function DayView({
         task={selectedTask}
         isOpen={isDetailOpen}
         onClose={() => setIsDetailOpen(false)}
-        projectId={projectId}
+        // No projectId prop needed here anymore
       />
     </>
   );

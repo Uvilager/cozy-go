@@ -21,20 +21,22 @@ interface TaskDetailDialogProps {
   task: Task | null;
   isOpen: boolean;
   onClose: () => void;
-  projectId?: number; // Pass projectId if needed for edit/delete actions
+  // Remove projectId prop, use task.project_id instead
+  // projectId?: number;
 }
 
 export default function TaskDetailDialog({
   task,
   isOpen,
   onClose,
-  projectId,
-}: TaskDetailDialogProps) {
+}: // projectId, // Removed from params
+TaskDetailDialogProps) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false); // State for edit dialog
 
   // Call hooks unconditionally at the top level
-  const deleteTaskMutation = useDeleteTask(projectId, {
+  // Use the project_id directly from the task object
+  const deleteTaskMutation = useDeleteTask(task?.project_id, {
     onSuccess: () => {
       onClose(); // Close the dialog on successful deletion
     },

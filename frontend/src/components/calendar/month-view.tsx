@@ -19,7 +19,7 @@ import TaskDetailDialog from "./task-detail-dialog"; // Import the dialog compon
 interface MonthViewProps {
   currentDate: Date; // First day of the month to display
   onDayClick?: (date: Date) => void; // Add callback for clicking a day cell
-  projectId?: number | undefined; // Add projectId prop
+  projectIds: number[]; // Changed from projectId to projectIds array
 }
 
 // Helper to get days for the calendar grid
@@ -35,12 +35,14 @@ const getCalendarDays = (monthDate: Date) => {
 export default function MonthView({
   currentDate,
   onDayClick,
-  projectId,
+  projectIds, // Use projectIds prop
 }: MonthViewProps) {
-  // Destructure projectId
   // --- Data Fetching ---
-  // Use the projectId passed from props
-  const { data: tasks, isLoading, error } = useTasksByProject(projectId);
+  // Use the projectIds array passed from props
+  // TODO: Update useTasksByProject hook to accept number[] and filter correctly.
+  // Temporary workaround: Pass single ID if exactly one is selected, otherwise undefined.
+  const projectIdForHook = projectIds.length === 1 ? projectIds[0] : undefined;
+  const { data: tasks, isLoading, error } = useTasksByProject(projectIdForHook);
 
   // --- State for Task Detail/Edit ---
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -188,7 +190,7 @@ export default function MonthView({
         task={selectedTask}
         isOpen={isDetailOpen}
         onClose={() => setIsDetailOpen(false)}
-        projectId={projectId} // Pass projectId for context
+        // No projectId prop needed here anymore
       />
     </div>
   );

@@ -18,18 +18,23 @@ import TaskDetailDialog from "./task-detail-dialog";
 interface WeekViewProps {
   currentDate: Date;
   onTimeSlotClick?: (date: Date) => void; // Callback for clicking an empty slot
-  projectId?: number | undefined; // Add projectId prop
+  projectIds: number[]; // Add projectId prop
 }
 
 export default function WeekView({
   currentDate,
   onTimeSlotClick,
-  projectId, // Destructure projectId
+  projectIds, // Destructure projectId
 }: WeekViewProps) {
+  // --- Data Fetching ---
+  // Use the projectIds array passed from props
+  // TODO: Update useTasksByProject hook to accept number[] and filter correctly.
+  // Temporary workaround: Pass single ID if exactly one is selected, otherwise undefined.
+  const projectIdForHook = projectIds.length === 1 ? projectIds[0] : undefined;
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   // Use the projectId passed from props
-  const { data: tasks, isLoading, error } = useTasksByProject(projectId);
+  const { data: tasks, isLoading, error } = useTasksByProject(projectIdForHook);
 
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
@@ -205,7 +210,7 @@ export default function WeekView({
         task={selectedTask}
         isOpen={isDetailOpen}
         onClose={() => setIsDetailOpen(false)}
-        projectId={projectId}
+        // No projectId prop needed here anymore
       />
     </>
   );
