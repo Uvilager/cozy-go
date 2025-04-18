@@ -8,7 +8,7 @@ import {
   isToday as isTodayCheck,
   getHours,
 } from "date-fns";
-import { useTasksByProject } from "@/hooks/useTasks";
+import { useTasks } from "@/hooks/useTasks"; // Import the updated hook
 import { Task } from "../tasks/data/schema";
 import TaskDetailDialog from "./task-detail-dialog";
 
@@ -27,16 +27,8 @@ export default function DayView({
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   // --- Data Fetching ---
-  // Use the projectIds array passed from props
-  // TODO: Update useTasksByProject hook to accept number[] and filter correctly.
-  // Temporary workaround: Pass single ID if exactly one is selected, otherwise undefined.
-  const projectIdForHook = projectIds.length === 1 ? projectIds[0] : undefined;
-  // Use the projectId passed from props
-  const {
-    data: allTasks,
-    isLoading,
-    error,
-  } = useTasksByProject(projectIdForHook);
+  // Use the projectIds array passed from props with the updated useTasks hook
+  const { data: allTasks, isLoading, error } = useTasks(projectIds);
 
   // --- Calendar Calculations ---
   const hours = Array.from({ length: 24 }, (_, i) => i); // 0 to 23

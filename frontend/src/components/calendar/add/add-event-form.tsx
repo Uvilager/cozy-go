@@ -23,9 +23,17 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"; // Import Select components
 import { Calendar } from "@/components/ui/calendar"; // shadcn calendar
 import { cn } from "@/lib/utils";
-import { useCreateTask } from "@/hooks/useTasks"; // Assuming useTasks hook handles mutations
+import { useCreateTask } from "@/hooks/useTasks";
+import { useProjects } from "@/hooks/useProjects"; // Import useProjects hook
 
 // Define the form schema using Zod
 const formSchema = z.object({
@@ -34,7 +42,11 @@ const formSchema = z.object({
   dueDate: z.date({ required_error: "A due date is required." }),
   startTime: z.string().optional(), // Optional time string e.g., "14:30"
   endTime: z.string().optional(), // Optional time string e.g., "15:00"
-  // Add other fields as needed: projectId, label, priority etc.
+  // Add projectId field - make it required
+  projectId: z
+    .number({ required_error: "Project is required." })
+    .int()
+    .positive({ message: "Project is required." }),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -58,26 +70,19 @@ const combineDateAndTime = (
 interface AddEventFormProps {
   onSuccess: () => void; // Callback to close dialog on success
   defaultDate?: Date; // Optional date to pre-fill
-  projectIds: number[]; // Changed from projectId to projectIds array (filter context)
+  // projectIds prop is no longer needed here
 }
 
 export default function AddEventForm({
   onSuccess,
   defaultDate,
-  projectIds, // Use projectIds prop
 }: AddEventFormProps) {
-  // Determine if a single project is pre-selected by the filter
-  const singleProjectId = projectIds.length === 1 ? projectIds[0] : undefined;
+  // Fetch projects for the selector
+  const { data: projects, isLoading: isLoadingProjects } = useProjects();
 
-  // TODO: If singleProjectId is undefined, the form should ideally render a
-  // mandatory project selector dropdown. For now, useCreateTask might default
-  // or error, and submission logic below handles it partially.
-
-  const createTaskMutation = useCreateTask(singleProjectId, {
-    // Pass the determined single project ID (or undefined)
-    // Pass the onSuccess callback from props to the hook's options
+  // Use the updated hook (doesn't need projectId initially)
+  const createTaskMutation = useCreateTask({
     onSuccess: onSuccess,
-    // onError is handled internally by the hook (shows toast), but could add more here if needed
   });
 
   const form = useForm<FormData>({
@@ -92,60 +97,44 @@ export default function AddEventForm({
           ? format(defaultDate, "HH:mm")
           : "",
       endTime: "", // Keep endTime empty initially
-      // Initialize other fields
+      projectId: undefined, // Initialize projectId as undefined
     },
   });
 
   function onSubmit(values: FormData) {
     console.log("Form submitted:", values);
 
-    // TODO: Map FormData to the structure expected by your API
-    // This might involve formatting dates/times, adding projectId etc.
+    // Map FormData to the structure expected by the API payload
     const apiPayload = {
       title: values.title,
-      description: values.description ?? "", // Ensure description is string or empty string
-      due_date: values.dueDate.toISOString(), // Keep due date as the primary date
-      // Combine date and time, convert to ISO string or null
+      description: values.description ?? "",
+      due_date: values.dueDate.toISOString(),
       start_time:
         combineDateAndTime(values.dueDate, values.startTime)?.toISOString() ??
         null,
       end_time:
         combineDateAndTime(values.dueDate, values.endTime)?.toISOString() ??
         null,
-      // Map other fields...
-      // Use the determined single project ID.
-      // TODO: If singleProjectId is undefined, this should ideally come from
-      // a mandatory project selector field within this form.
-      project_id: singleProjectId ?? 0, // Sending 0 might cause backend error if no project selected
+      // project_id is now part of the form data (values.projectId)
       label: "", // TODO: Add Label selector
       priority: "medium", // TODO: Add Priority selector
       status: "todo",
     };
 
-    createTaskMutation.mutate(apiPayload, {
-      onSuccess: () => {
-        console.log("Task created successfully!");
-        onSuccess(); // Close the dialog
-        // Query invalidation is likely handled within the useCreateTask hook
-      },
-      onError: (error) => {
-        console.error("Failed to create task:", error);
-        // TODO: Show user-friendly error message
-      },
-    });
-
-    // Add a check before mutating if a project ID is required and wasn't determined
-    // TODO: This check should be more robust if a project selector is added.
-    if (singleProjectId === undefined) {
-      console.error(
-        "Cannot submit task without a project ID (or multiple projects selected in filter)"
-      );
-      // Optionally show a toast error to the user
-      // toast.error("Please select a project for the task.");
-      return; // Prevent submission
+    // The projectId comes directly from the form values now
+    if (!values.projectId) {
+      // This should be caught by Zod validation, but double-check
+      console.error("Project ID is missing in form values.");
+      // Potentially show a toast error
+      return;
     }
 
-    createTaskMutation.mutate(apiPayload);
+    // Call the updated mutation, passing payload and projectId
+    createTaskMutation.mutate({
+      payload: apiPayload,
+      projectId: values.projectId,
+    });
+    // onSuccess/onError are handled by the hook's configuration
   }
 
   return (
@@ -205,6 +194,45 @@ export default function AddEventForm({
           )}
         />
 
+        {/* Project Selector */}
+        <FormField
+          control={form.control}
+          name="projectId"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Project</FormLabel>
+              <Select
+                onValueChange={(value) => field.onChange(Number(value))} // Ensure value is number
+                defaultValue={field.value?.toString()} // Convert number to string for Select
+                disabled={isLoadingProjects}
+              >
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a project" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {isLoadingProjects ? (
+                    <SelectItem value="loading" disabled>
+                      Loading projects...
+                    </SelectItem>
+                  ) : (
+                    projects?.map((project) => (
+                      <SelectItem
+                        key={project.id}
+                        value={project.id.toString()}
+                      >
+                        {project.name}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
         {/* Basic Time Inputs (Consider dedicated Time Picker component later) */}
         <div className="grid grid-cols-2 gap-4">
           <FormField
@@ -234,10 +262,6 @@ export default function AddEventForm({
             )}
           />
         </div>
-
-        {/* TODO: Conditionally render a Project Selector FormField here */}
-        {/* if singleProjectId is undefined */}
-        {/* <FormField control={form.control} name="projectId" render={...} /> */}
 
         <FormField
           control={form.control}

@@ -18,8 +18,8 @@ type TaskRepository interface {
 	CreateTask(ctx context.Context, task *models.Task, userID int) (int, error)
 	// GetTaskByID needs userID to verify ownership
 	GetTaskByID(ctx context.Context, id int, userID int) (*models.Task, error)
-	// GetTasksByProjectID needs userID to verify ownership of the project
-	GetTasksByProjectID(ctx context.Context, projectID int, userID int) ([]models.Task, error)
+	// GetTasksByProjectIDs needs userID to verify ownership of the projects
+	GetTasksByProjectIDs(ctx context.Context, projectIDs []int, userID int) ([]models.Task, error)
 	// UpdateTask needs userID to verify ownership
 	UpdateTask(ctx context.Context, task *models.Task, userID int) error
 	// DeleteTask needs userID to verify ownership
@@ -43,6 +43,8 @@ func NewTaskRepository() TaskRepository {
 
 // checkProjectOwnership verifies if a project belongs to a specific user.
 // Returns pgx.ErrNoRows if not found/owned, other errors on DB issues.
+// Note: This is used by Create, Update, Delete operations for a *single* project context.
+// Get operations involving multiple projects might need direct joins for efficiency.
 func (r *pgTaskRepository) checkProjectOwnership(ctx context.Context, projectID int, userID int) error {
 	var exists bool
 	checkQuery := `SELECT EXISTS(SELECT 1 FROM projects WHERE id = $1 AND user_id = $2)`
@@ -61,7 +63,7 @@ func (r *pgTaskRepository) checkProjectOwnership(ctx context.Context, projectID 
 
 // CreateTask inserts a new task into the database after verifying project ownership.
 func (r *pgTaskRepository) CreateTask(ctx context.Context, task *models.Task, userID int) (int, error) {
-	// 1. Verify ownership of the project first
+	// 1. Verify ownership of the project first (using the single project check)
 	if err := r.checkProjectOwnership(ctx, task.ProjectID, userID); err != nil {
 		// If ownership check fails (ErrNoRows or other DB error), return error
 		return 0, err
@@ -133,27 +135,26 @@ func (r *pgTaskRepository) GetTaskByID(ctx context.Context, id int, userID int) 
 	return task, nil
 }
 
-// GetTasksByProjectID retrieves all tasks for a given project ID, ensuring the user owns the project.
-func (r *pgTaskRepository) GetTasksByProjectID(ctx context.Context, projectID int, userID int) ([]models.Task, error) {
-	// 1. Verify ownership of the project first
-	if err := r.checkProjectOwnership(ctx, projectID, userID); err != nil {
-		// If ownership check fails (ErrNoRows or other DB error), return error
-		// Return empty slice and no error if ErrNoRows, or the actual error otherwise
-		if err == pgx.ErrNoRows {
-			return []models.Task{}, nil // Return empty slice if project not found/owned
-		}
-		return nil, err
+// GetTasksByProjectIDs retrieves all tasks for a given list of project IDs, ensuring the user owns the projects.
+// If projectIDs is empty or nil, it returns an empty slice without querying.
+func (r *pgTaskRepository) GetTasksByProjectIDs(ctx context.Context, projectIDs []int, userID int) ([]models.Task, error) {
+	// If no project IDs are provided, return immediately.
+	if len(projectIDs) == 0 {
+		return []models.Task{}, nil
 	}
 
-	// 2. Proceed with fetching tasks if ownership is verified
-	query := `SELECT id, project_id, title, description, status, label, priority, due_date, start_time, end_time, created_at, updated_at
-              FROM tasks
-              WHERE project_id = $1
-              ORDER BY created_at DESC` // Example ordering
+	// Query tasks belonging to the specified project IDs AND owned by the user.
+	// We join with projects table to filter by user_id directly.
+	// Using ANY($1) for PostgreSQL array matching.
+	query := `SELECT t.id, t.project_id, t.title, t.description, t.status, t.label, t.priority, t.due_date, t.start_time, t.end_time, t.created_at, t.updated_at
+              FROM tasks t
+              JOIN projects p ON t.project_id = p.id
+              WHERE t.project_id = ANY($1) AND p.user_id = $2
+              ORDER BY t.created_at DESC` // Example ordering
 
-	rows, err := r.db.Query(ctx, query, projectID)
+	rows, err := r.db.Query(ctx, query, projectIDs, userID)
 	if err != nil {
-		log.Printf("Error querying tasks for project ID %d: %v", projectID, err)
+		log.Printf("Error querying tasks for project IDs %v, user %d: %v", projectIDs, userID, err)
 		return nil, err
 	}
 	defer rows.Close()

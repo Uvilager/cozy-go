@@ -12,7 +12,7 @@ import {
   isToday,
 } from "date-fns";
 import { cn } from "@/lib/utils";
-import { useTasksByProject } from "@/hooks/useTasks"; // Import the hook
+import { useTasks } from "@/hooks/useTasks"; // Import the updated hook
 import { Task } from "../tasks/data/schema"; // Import Task type
 import TaskDetailDialog from "./task-detail-dialog"; // Import the dialog component
 
@@ -38,11 +38,8 @@ export default function MonthView({
   projectIds, // Use projectIds prop
 }: MonthViewProps) {
   // --- Data Fetching ---
-  // Use the projectIds array passed from props
-  // TODO: Update useTasksByProject hook to accept number[] and filter correctly.
-  // Temporary workaround: Pass single ID if exactly one is selected, otherwise undefined.
-  const projectIdForHook = projectIds.length === 1 ? projectIds[0] : undefined;
-  const { data: tasks, isLoading, error } = useTasksByProject(projectIdForHook);
+  // Use the projectIds array passed from props with the updated useTasks hook
+  const { data: tasks, isLoading, error } = useTasks(projectIds);
 
   // --- State for Task Detail/Edit ---
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);

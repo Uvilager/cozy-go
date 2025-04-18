@@ -33,10 +33,10 @@ func SetupRoutes(mux *http.ServeMux, projectHandler *handlers.ProjectHandler, ta
 
 	// --- Task Routes (Protected) ---
 	// Note: Assumes Go 1.22+ for path parameters like {projectID} and {taskID}
-	mux.Handle("POST /projects/{projectID}/tasks", applyAuth(taskHandler.CreateTask))
-	mux.Handle("GET /projects/{projectID}/tasks", applyAuth(taskHandler.ListTasksByProject))
+	mux.Handle("POST /projects/{projectID}/tasks", applyAuth(taskHandler.CreateTask)) // Create task within a specific project
+	mux.Handle("GET /tasks", applyAuth(taskHandler.ListTasks))                       // List tasks, potentially filtered by project_ids query param
 	mux.Handle("GET /tasks/{taskID}", applyAuth(taskHandler.GetTask))
-	mux.Handle("PUT /projects/{projectID}/tasks/{taskID}", applyAuth(taskHandler.UpdateTask))
+	mux.Handle("PUT /projects/{projectID}/tasks/{taskID}", applyAuth(taskHandler.UpdateTask)) // Update task within a specific project context
 	mux.Handle("DELETE /tasks/{taskID}", applyAuth(taskHandler.DeleteTask))
 	// Optional: Route for updating only status (consider deprecating)
 	mux.Handle("PATCH /tasks/{taskID}/status", applyAuth(taskHandler.UpdateTaskStatusHandler))

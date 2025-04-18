@@ -10,7 +10,7 @@ import {
 // import TaskTableClient from "@/components/tasks/task-table-client"; // Rendered by TasksView now
 // import { ProjectPicker } from "@/components/projects/project-picker"; // Rendered by TasksView now
 import TasksView from "@/components/tasks/tasks-view"; // Import the new client component wrapper
-import { getProjects, getTasksByProject } from "@/lib/api";
+import { getProjects, getTasksByProjectIds } from "@/lib/api"; // Import the new tasks function
 import { queryKeys } from "@/lib/queryKeys"; // Import query keys
 import { cookies } from "next/headers"; // Import cookies function for Server Components
 
@@ -70,11 +70,12 @@ export default async function TasksPage({
   // Prefetch the task data only if a valid project ID is determined
   if (projectIdToFetch !== undefined) {
     try {
+      // Prefetch using the new function and array key structure
       await queryClient.prefetchQuery({
-        // Use the centralized query key
-        queryKey: queryKeys.tasks(projectIdToFetch),
-        // Use the new API function, passing the token
-        queryFn: () => getTasksByProject(projectIdToFetch, token), // Pass token here
+        // Use the centralized query key, passing the ID in an array
+        queryKey: queryKeys.tasks([projectIdToFetch]),
+        // Use the new API function, passing the ID in an array and the token
+        queryFn: () => getTasksByProjectIds([projectIdToFetch], token),
       });
     } catch (error) {
       console.error(

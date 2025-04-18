@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"; // Consolidate imports
 import {
-  getTasksByProject,
+  // getTasksByProject, // Keep if needed elsewhere, otherwise remove
+  getTasksByProjectIds, // Import the new function
   createTask,
   CreateTaskPayload,
   deleteTask,
@@ -14,27 +15,29 @@ import { toast } from "sonner"; // Import toast
 // useProjects hook moved to useProjects.ts
 
 /**
- * Custom hook to fetch tasks for a specific project ID.
+ * Custom hook to fetch tasks, optionally filtered by one or more project IDs.
  * Encapsulates the useQuery logic for fetching tasks.
- * @param projectId The ID of the project whose tasks are to be fetched.
+ * @param projectIds An array of project IDs to filter by, or undefined/empty to fetch none (or all, depending on API).
  */
-export const useTasksByProject = (projectId: number | undefined) => {
+export const useTasks = (projectIds: number[] | undefined) => {
+  // Ensure projectIds is always an array for the query key, even if empty
+  const queryKeyProjectIds = Array.isArray(projectIds) ? projectIds : [];
+
   return useQuery({
-    queryKey: queryKeys.tasks(projectId), // Use centralized query key function
-    // Only call the API function if projectId is defined and valid
+    // Assuming queryKeys.tasks can handle an array. We might need to adjust queryKeys.ts later.
+    // Sorting ensures the key is consistent regardless of ID order.
+    queryKey: queryKeys.tasks(queryKeyProjectIds.sort()),
     queryFn: () => {
-      if (typeof projectId !== "number") {
-        // Return a resolved promise with empty array or throw an error if projectId is invalid/missing
-        // This prevents the query from running unnecessarily
+      // Only fetch if projectIds is a non-empty array
+      if (!Array.isArray(projectIds) || projectIds.length === 0) {
+        // Return empty array if no projects are selected
         return Promise.resolve([]);
-        // Alternatively, you could throw: throw new Error("Project ID is required");
-        // But React Query's `enabled` option handles this more gracefully.
       }
-      return getTasksByProject(projectId); // Use the API function
+      // Call the new API function
+      return getTasksByProjectIds(projectIds);
     },
-    // The query will only run if projectId is a truthy value (i.e., a valid number).
-    // This prevents unnecessary API calls when no project is selected.
-    enabled: !!projectId && typeof projectId === "number",
+    // The query will only run if projectIds is an array with at least one element.
+    enabled: Array.isArray(projectIds) && projectIds.length > 0,
     // Optional: Configure staleTime, cacheTime, etc.
     // staleTime: 5 * 60 * 1000, // 5 minutes
   });
@@ -45,27 +48,36 @@ export const useTasksByProject = (projectId: number | undefined) => {
 /**
  * Custom hook for creating a new task.
  * Encapsulates the useMutation logic for task creation.
- * @param projectId The ID of the project to add the task to.
  * @param options Optional callbacks like onSuccess, onError to be executed *after* the hook's internal handlers.
  */
-export const useCreateTask = (
-  projectId: number | undefined,
-  options?: { onSuccess?: () => void; onError?: (error: Error) => void }
-) => {
+export const useCreateTask = (options?: {
+  onSuccess?: () => void;
+  onError?: (error: Error) => void;
+}) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (newTaskData: CreateTaskPayload) => {
-      if (typeof projectId !== "number") {
-        // Should be prevented by UI, but double-check
-        return Promise.reject(new Error("Project ID is required."));
+    // mutationFn now expects an object with payload and projectId
+    mutationFn: (variables: {
+      payload: CreateTaskPayload;
+      projectId: number;
+    }) => {
+      const { payload, projectId } = variables;
+      // Basic check, though form validation should handle this
+      if (typeof projectId !== "number" || projectId <= 0) {
+        return Promise.reject(new Error("Valid Project ID is required."));
       }
-      return createTask(projectId, newTaskData);
+      // Call API with projectId from variables
+      return createTask(projectId, payload);
     },
-    onSuccess: (data) => {
+    // onSuccess receives data and the variables passed to mutate
+    onSuccess: (data, variables) => {
       // Hook's internal success logic
       toast.success(`Task "${data.title}" created successfully!`);
-      queryClient.invalidateQueries({ queryKey: queryKeys.tasks(projectId) });
+      // Invalidate using the projectId from variables
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.tasks(variables.projectId),
+      });
       // Call the onSuccess callback passed from the component, if any
       options?.onSuccess?.();
     },
@@ -107,7 +119,7 @@ export const useDeleteTask = (
     onSuccess: () => {
       // Hook's internal success logic
       toast.success("Task deleted successfully!");
-      // Invalidate the tasks query for the specific project
+      // Invalidate the tasks query, potentially refined by the project ID
       queryClient.invalidateQueries({ queryKey: queryKeys.tasks(projectId) });
       // Call the onSuccess callback passed from the component, if any
       options?.onSuccess?.();
@@ -157,10 +169,10 @@ export const useUpdateTask = (
     onSuccess: (updatedTask) => {
       // Hook's internal success logic
       toast.success(`Task "${updatedTask.title}" updated successfully!`);
-      // Invalidate the tasks query for the specific project
+      // Invalidate the tasks query, potentially refined by the project ID
       queryClient.invalidateQueries({ queryKey: queryKeys.tasks(projectId) });
       // Optional: Update the specific task query cache if you have one (e.g., queryKeys.task(updatedTask.id))
-      // queryClient.setQueryData(queryKeys.task(updatedTask.id), updatedTask);
+      // queryClient.setQueryData(queryKeys.task(updatedTask.id), updatedTask); // Assuming queryKeys.task exists
       // Call the onSuccess callback passed from the component, if any
       options?.onSuccess?.(updatedTask);
     },

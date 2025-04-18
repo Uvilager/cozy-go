@@ -64,6 +64,58 @@ export const getTasksByProject = async (
 };
 
 /**
+ * Fetches tasks for a specific list of project IDs from the API.
+ * @param projectIds An array of project IDs.
+ * @param token Optional auth token for server-side requests.
+ */
+export const getTasksByProjectIds = async (
+  projectIds: number[],
+  token?: string
+): Promise<Task[]> => {
+  // If the array is empty, don't make the API call, return empty array
+  if (!projectIds || projectIds.length === 0) {
+    console.warn(
+      "API: getTasksByProjectIds called with empty or invalid projectIds."
+    );
+    return [];
+  }
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  // Join the array into a comma-separated string for the query parameter
+  const projectIdsParam = projectIds.join(",");
+  try {
+    console.log(`API: Fetching tasks for project IDs [${projectIdsParam}]...`);
+    // Use the new endpoint GET /tasks?project_ids=...
+    const response = await axiosInstance.get<Task[]>(
+      `/tasks?project_ids=${projectIdsParam}`,
+      { headers }
+    );
+
+    // Check for successful status code
+    if (response.status !== 200) {
+      console.warn(
+        `API: Unexpected status code ${response.status} fetching tasks for project IDs [${projectIdsParam}].`
+      );
+      return []; // Return empty array for non-200 status
+    }
+
+    console.log(
+      `API: Tasks for project IDs [${projectIdsParam}] fetched successfully:`,
+      response.data
+    );
+    return Array.isArray(response.data) ? response.data : [];
+  } catch (error) {
+    console.error(
+      `API Error fetching tasks for project IDs [${projectIdsParam}]:`,
+      error
+    );
+    throw error;
+  }
+};
+
+/**
  * Creates a new task for a specific project ID.
  * @param projectId The ID of the project.
  * @param taskData The data for the new task.

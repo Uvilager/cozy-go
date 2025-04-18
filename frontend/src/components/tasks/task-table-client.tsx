@@ -4,7 +4,7 @@ import React from "react";
 // Removed useQuery import as it's now in the hook
 import { columns } from "@/components/tasks/table/columns"; // Adjusted path based on file structure
 import { DataTable } from "@/components/tasks/table/data-table"; // Adjusted path based on file structure
-import { useTasksByProject } from "@/hooks/useTasks"; // Import the custom hook
+import { useTasks } from "@/hooks/useTasks"; // Import the updated hook
 
 // Removed duplicated fetchTasks and API_URL
 
@@ -20,7 +20,7 @@ export default function TaskTableClient({ projectId }: TaskTableClientProps) {
     isLoading, // Use loading state from the hook
     isError, // Use error state from the hook
     error, // Use error object from the hook
-  } = useTasksByProject(projectId); // Pass projectId to the hook
+  } = useTasks(projectId !== undefined ? [projectId] : undefined); // Pass projectId as an array if defined
 
   // Handle loading state (initial load is handled by hydration, but this catches refetches)
   if (isLoading && !tasksData) {

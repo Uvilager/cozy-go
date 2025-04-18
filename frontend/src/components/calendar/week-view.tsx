@@ -11,7 +11,7 @@ import {
   getHours, // Import getHours
 } from "date-fns";
 import { cn } from "@/lib/utils";
-import { useTasksByProject } from "@/hooks/useTasks";
+import { useTasks } from "@/hooks/useTasks"; // Import the updated hook
 import { Task } from "../tasks/data/schema";
 import TaskDetailDialog from "./task-detail-dialog";
 
@@ -27,14 +27,12 @@ export default function WeekView({
   projectIds, // Destructure projectId
 }: WeekViewProps) {
   // --- Data Fetching ---
-  // Use the projectIds array passed from props
-  // TODO: Update useTasksByProject hook to accept number[] and filter correctly.
-  // Temporary workaround: Pass single ID if exactly one is selected, otherwise undefined.
-  const projectIdForHook = projectIds.length === 1 ? projectIds[0] : undefined;
+  // Use the projectIds array passed from props with the updated useTasks hook
+  const { data: tasks, isLoading, error } = useTasks(projectIds);
+
+  // --- State for Task Detail/Edit ---
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
-  // Use the projectId passed from props
-  const { data: tasks, isLoading, error } = useTasksByProject(projectIdForHook);
 
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });

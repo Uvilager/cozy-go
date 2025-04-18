@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings" // Added strings import
 
 	"cozy-go/task-service/internal/models"
 	"cozy-go/task-service/internal/utils" // Import utils package
@@ -106,33 +107,41 @@ func (h *TaskHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Successfully handled CreateTask request for task ID: %d in project ID: %d", createdID, task.ProjectID)
 }
 
-// ListTasksByProject handles the GET /projects/{projectID}/tasks request.
-func (h *TaskHandler) ListTasksByProject(w http.ResponseWriter, r *http.Request) {
-	projectIDStr := r.PathValue("projectID")
-	if projectIDStr == "" {
-		log.Println("Project ID not found in path for ListTasksByProject")
-		http.Error(w, "Project ID missing in URL path", http.StatusBadRequest)
-		return
-	}
-	projectID, err := strconv.Atoi(projectIDStr)
-	if err != nil {
-		log.Printf("Invalid project ID format in ListTasksByProject: %s", projectIDStr)
-		http.Error(w, "Invalid project ID format", http.StatusBadRequest)
-		return
-	}
-
-	// Get UserID from context
+// ListTasks handles the GET /tasks?project_ids=... request.
+func (h *TaskHandler) ListTasks(w http.ResponseWriter, r *http.Request) {
+	// Get UserID from context first
 	userID, err := utils.GetUserIDFromContext(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// Call repository with userID
-	tasks, err := h.repo.GetTasksByProjectID(r.Context(), projectID, userID)
+	// Get project_ids from query parameter
+	projectIDsStr := r.URL.Query().Get("project_ids")
+	var projectIDs []int
+
+	if projectIDsStr != "" {
+		// Split the comma-separated string
+		idsStr := strings.Split(projectIDsStr, ",")
+		projectIDs = make([]int, 0, len(idsStr))
+		for _, idStr := range idsStr {
+			id, err := strconv.Atoi(strings.TrimSpace(idStr))
+			if err != nil {
+				log.Printf("Invalid project ID format in query parameter 'project_ids': %s", idStr)
+				http.Error(w, "Invalid project ID format in query parameter 'project_ids'", http.StatusBadRequest)
+				return
+			}
+			projectIDs = append(projectIDs, id)
+		}
+	}
+	// If projectIDsStr is empty, projectIDs remains an empty slice,
+	// and the repository method will handle returning an empty task list.
+
+	// Call repository with userID and the slice of project IDs
+	tasks, err := h.repo.GetTasksByProjectIDs(r.Context(), projectIDs, userID)
 	if err != nil {
 		// Repo handles ErrNoRows check for ownership, returns empty slice if not owned/found
-		log.Printf("Error calling repository GetTasksByProjectID for project %d, user %d: %v", projectID, userID, err)
+		log.Printf("Error calling repository GetTasksByProjectIDs for projects %v, user %d: %v", projectIDs, userID, err)
 		http.Error(w, "Failed to retrieve tasks", http.StatusInternalServerError)
 		return
 	}
@@ -142,8 +151,9 @@ func (h *TaskHandler) ListTasksByProject(w http.ResponseWriter, r *http.Request)
 	if err := json.NewEncoder(w).Encode(tasks); err != nil {
 		log.Printf("Error encoding list tasks response: %v", err)
 	}
-	log.Printf("Successfully handled ListTasksByProject request for project ID: %d, found %d tasks", projectID, len(tasks))
+	log.Printf("Successfully handled ListTasks request for project IDs: %v, found %d tasks", projectIDs, len(tasks))
 }
+
 
 // GetTask handles the GET /tasks/{taskID} request.
 func (h *TaskHandler) GetTask(w http.ResponseWriter, r *http.Request) {
