@@ -38,6 +38,20 @@ services:
       - taskdb
       - rabbitmq
 
+  calendar-service:
+    build: ./calendar-service
+    ports:
+      - "8082:8082" # Expose calendar-service on port 8082
+    environment:
+      - CALENDAR_SERVICE_PORT=8082
+      # Construct DATABASE_URL from individual parts for pgxpool
+      - DATABASE_URL=postgres://calendaruser:calendarpassword@calendardb:5432/calendardb?sslmode=disable
+      - JWT_SECRET=N4fK9z$B&E)H@McQfTjWnZr4u7x!A%D* # MUST MATCH auth-service
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/ # For potential future events
+    depends_on:
+      - calendardb
+      - rabbitmq
+
   # frontend:
   #   build: ./frontend
   #   ports:
@@ -79,6 +93,17 @@ services:
     volumes:
       - taskdb_data:/var/lib/postgresql/data
 
+  calendardb: # Database for the calendar service
+    image: postgres:latest
+    environment:
+      POSTGRES_USER: calendaruser
+      POSTGRES_DB: calendardb
+      POSTGRES_PASSWORD: calendarpassword
+    ports:
+      - "5435:5432" # Map to host port 5435
+    volumes:
+      - calendardb_data:/var/lib/postgresql/data
+
   pgadmin:
     image: dpage/pgadmin4
     environment:
@@ -102,3 +127,4 @@ services:
 volumes:
   db_data:
   taskdb_data: # Volume for taskdb persistence
+  calendardb_data: # Volume for calendardb persistence
