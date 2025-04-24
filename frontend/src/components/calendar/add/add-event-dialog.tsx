@@ -10,21 +10,22 @@ import {
 } from "@/components/ui/dialog";
 // Import the form component
 import AddEventForm from "./add-event-form";
+import { Calendar as CalendarData } from "@/lib/api/calendars"; // Assuming a type for calendar data
 
 interface AddEventDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void; // For closing via overlay/esc
   onClose: () => void; // Explicit close function
-  defaultDate?: Date; // Optional date to pre-fill
-  projectIds: number[]; // Changed from projectId to projectIds array (filter context)
+  selectableCalendars: Pick<CalendarData, "id" | "name">[]; // Pass the list of calendars
+  defaultStartTime?: Date; // Optional start time to pre-fill
 }
 
 export default function AddEventDialog({
   isOpen,
   onOpenChange,
   onClose,
-  defaultDate,
-  projectIds, // Use projectIds prop
+  selectableCalendars, // Use selectableCalendars
+  defaultStartTime,
 }: AddEventDialogProps) {
   const handleSuccess = () => {
     onClose(); // Call the passed onClose function
@@ -36,17 +37,16 @@ export default function AddEventDialog({
       {/* Remove DialogTrigger */}
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Add New Event/Task</DialogTitle>
+          <DialogTitle>Add New Event</DialogTitle>
           <DialogDescription>
-            Fill in the details for your new calendar item.
+            Fill in the details for your new event.
           </DialogDescription>
         </DialogHeader>
-        {/* Render the form component, passing defaultDate and projectId */}
-        {/* Render the form component, passing defaultDate and projectIds */}
+        {/* Render the form component, passing required props */}
         <AddEventForm
           onSuccess={handleSuccess}
-          defaultDate={defaultDate}
-          projectIds={projectIds} // Pass the array
+          selectableCalendars={selectableCalendars} // Pass selectableCalendars
+          defaultStartTime={defaultStartTime}
         />
         {/* DialogFooter can be used if the form doesn't have its own submit button */}
         {/* <DialogFooter>

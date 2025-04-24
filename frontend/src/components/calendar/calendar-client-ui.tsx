@@ -20,17 +20,19 @@ import MonthView from "./month-view";
 import WeekView from "./week-view";
 import DayView from "./day-view";
 import AddEventDialog from "./add/add-event-dialog";
+import { useCalendars } from "@/hooks/useCalendar"; // Import the hook to fetch calendars
+import { Calendar as CalendarData } from "@/lib/api/calendars"; // Keep type import
 
 interface CalendarClientUIProps {
   // Initial props passed from the server component (page.tsx)
   initialDate?: Date; // Keep initialDate if needed for first load before store hydrates
   initialView?: CalendarView;
   // Remove initialProjectId
-  // initialProjectId?: number;
+  // initialProjectId?: number; // Keep for reference, but not used
 }
 
-// Helper to parse project IDs from URL param (copied from MultiProjectSelector)
-const parseProjectIds = (param: string | null): number[] => {
+// Helper to parse calendar IDs from URL param (e.g., "1,2,3")
+const parseCalendarIds = (param: string | null): number[] => {
   if (!param) return [];
   return param.split(",").map(Number).filter(Boolean); // Filter out NaN/0 if parsing fails
 };
@@ -46,13 +48,25 @@ CalendarClientUIProps) {
   const { currentDate, setCurrentDate } = useCalendarStore();
   // Get project IDs from URL search params
   const searchParams = useSearchParams();
-  const selectedProjectIdsArray = parseProjectIds(searchParams.get("projects"));
+  // Get the calendar IDs from the 'calendars' URL parameter (plural)
+  const selectedCalendarIdsArray = parseCalendarIds(
+    searchParams.get("calendars") // Changed from "calendar" to "calendars"
+  );
 
   // State for the Add Event Dialog
   const [isAddEventDialogOpen, setIsAddEventDialogOpen] = useState(false);
   const [selectedDateForNewEvent, setSelectedDateForNewEvent] = useState<
     Date | undefined
   >(undefined);
+
+  // --- Fetch All Calendars ---
+  const { data: allCalendars, isLoading: isLoadingCalendars } = useCalendars();
+
+  // --- Filter Calendars based on URL params ---
+  const selectableCalendarsDetails: Pick<CalendarData, "id" | "name">[] =
+    allCalendars
+      ?.filter((cal) => selectedCalendarIdsArray.includes(cal.id))
+      .map((cal) => ({ id: cal.id, name: cal.name })) ?? []; // Filter and map, provide default empty array
 
   // --- Handlers ---
   const handleSetView = (newView: CalendarView) => {
@@ -118,6 +132,9 @@ CalendarClientUIProps) {
 
   // --- Add Event Dialog Handlers ---
   const handleOpenAddDialog = (date?: Date) => {
+    console.log(
+      "handleOpenAddDialog called. Setting isAddEventDialogOpen to true."
+    );
     setSelectedDateForNewEvent(date);
     setIsAddEventDialogOpen(true);
   };
@@ -135,7 +152,7 @@ CalendarClientUIProps) {
           <MonthView
             currentDate={currentDate}
             onDayClick={handleOpenAddDialog}
-            projectIds={selectedProjectIdsArray} // Pass array
+            calendarIds={selectedCalendarIdsArray} // Pass array
           />
         );
       case "week":
@@ -143,7 +160,7 @@ CalendarClientUIProps) {
           <WeekView
             currentDate={currentDate}
             onTimeSlotClick={handleOpenAddDialog}
-            projectIds={selectedProjectIdsArray} // Pass array
+            calendarIds={selectedCalendarIdsArray} // Pass array
           />
         );
       case "day":
@@ -151,13 +168,15 @@ CalendarClientUIProps) {
           <DayView
             currentDate={currentDate}
             onTimeSlotClick={handleOpenAddDialog}
-            projectIds={selectedProjectIdsArray} // Pass array
+            calendarIds={selectedCalendarIdsArray} // Pass array
           />
         );
       default:
         return null;
     }
   };
+
+  // Removed Debugging Logs
 
   return (
     // This component now renders the full calendar UI including Sidebar
@@ -185,14 +204,16 @@ CalendarClientUIProps) {
         <div className="flex-1 overflow-hidden">{renderView()}</div>
       </div>
 
-      {/* Render Add Event Dialog (controlled by state) */}
-      <AddEventDialog
-        isOpen={isAddEventDialogOpen}
-        onOpenChange={setIsAddEventDialogOpen}
-        onClose={handleCloseAddDialog}
-        defaultDate={selectedDateForNewEvent}
-        projectIds={selectedProjectIdsArray} // Pass array - Dialog needs to handle multi-select context
-      />
+      {/* Render Add Event Dialog (controlled by state) - Only if calendars are available */}
+      {isAddEventDialogOpen && selectableCalendarsDetails.length > 0 && (
+        <AddEventDialog
+          isOpen={isAddEventDialogOpen}
+          onOpenChange={setIsAddEventDialogOpen}
+          onClose={handleCloseAddDialog}
+          selectableCalendars={selectableCalendarsDetails} // Pass the detailed list
+          defaultStartTime={selectedDateForNewEvent} // Pass the selected date/time as start time
+        />
+      )}
     </>
   );
 }

@@ -13,7 +13,8 @@ import (
 type EventRepository interface {
 	CreateEvent(ctx context.Context, event *models.Event) (int, error)
 	GetEventByID(ctx context.Context, eventID int, userID int) (*models.Event, error) // Include userID for authorization check
-	ListEventsByCalendar(ctx context.Context, calendarID int, userID int, startTime, endTime time.Time) ([]models.Event, error) // Filter by time range
+	// Renamed and updated to accept multiple calendar IDs
+	ListEventsByCalendarIDs(ctx context.Context, calendarIDs []int, userID int, startTime, endTime time.Time) ([]models.Event, error)
 	UpdateEvent(ctx context.Context, event *models.Event) error
 	DeleteEvent(ctx context.Context, eventID int, userID int) error // Include userID for authorization check
 }
@@ -67,23 +68,25 @@ func (r *pgEventRepository) GetEventByID(ctx context.Context, eventID int, userI
 	return event, nil
 }
 
-// ListEventsByCalendar retrieves events for a specific calendar within a time range, ensuring ownership.
-func (r *pgEventRepository) ListEventsByCalendar(ctx context.Context, calendarID int, userID int, startTime, endTime time.Time) ([]models.Event, error) {
-	// Ensure the user owns the calendar (this might require joining with a calendars table or a separate check)
+// ListEventsByCalendarIDs retrieves events for multiple calendars within a time range, ensuring ownership.
+func (r *pgEventRepository) ListEventsByCalendarIDs(ctx context.Context, calendarIDs []int, userID int, startTime, endTime time.Time) ([]models.Event, error) {
+	// Ensure the user owns the calendars (this might require joining with a calendars table or a separate check)
 	// For now, we assume the check happens in the handler or middleware based on calendarID ownership.
 	// We still filter by user_id on the event itself as a safety measure.
 	query := `
 		SELECT id, calendar_id, user_id, title, description, start_time, end_time, location, color, created_at, updated_at
 		FROM events
-		WHERE calendar_id = $1
+		WHERE calendar_id = ANY($1) -- Use ANY operator for the array/slice
 		  AND user_id = $2
 		  AND start_time < $4 -- Events starting before the end time
 		  AND end_time > $3   -- Events ending after the start time
 		ORDER BY start_time ASC`
 
-	rows, err := r.db.Query(ctx, query, calendarID, userID, startTime, endTime)
+	// Pass the slice directly to the query method
+	rows, err := r.db.Query(ctx, query, calendarIDs, userID, startTime, endTime)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list events for calendar %d: %w", calendarID, err)
+		// Update error message to reflect multiple IDs
+		return nil, fmt.Errorf("failed to list events for calendars %v: %w", calendarIDs, err)
 	}
 	defer rows.Close()
 

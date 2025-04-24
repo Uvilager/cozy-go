@@ -32,199 +32,166 @@ import {
 } from "@/components/ui/select"; // Import Select components
 import { Calendar } from "@/components/ui/calendar"; // shadcn calendar
 import { cn } from "@/lib/utils";
-import { useCreateTask } from "@/hooks/useTasks";
-import { useProjects } from "@/hooks/useProjects"; // Import useProjects hook
+import { useCreateEvent } from "@/hooks/useEvents"; // Import the actual hook
+import { CreateEventPayload } from "@/lib/api/events"; // Import payload type
+import { Calendar as CalendarData } from "@/lib/api/calendars"; // Assuming a type for calendar data
 
-// Define the form schema using Zod
-const formSchema = z.object({
-  title: z.string().min(1, { message: "Title is required." }),
-  description: z.string().optional(),
-  dueDate: z.date({ required_error: "A due date is required." }),
-  startTime: z.string().optional(), // Optional time string e.g., "14:30"
-  endTime: z.string().optional(), // Optional time string e.g., "15:00"
-  // Add projectId field - make it required
-  projectId: z
-    .number({ required_error: "Project is required." })
-    .int()
-    .positive({ message: "Project is required." }),
-});
+// Define the form schema using Zod based on CreateEventPayload
+const formSchema = z
+  .object({
+    // Add calendarId field - make it required
+    calendarId: z
+      .number({ required_error: "Calendar is required." })
+      .int()
+      .positive({ message: "Calendar is required." }),
+    title: z.string().min(1, { message: "Title is required." }),
+    description: z.string().optional(),
+    startDate: z.date({ required_error: "Start date is required." }),
+    startTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, {
+      message: "Invalid time format (HH:mm)",
+    }), // Required HH:mm format
+    endDate: z.date({ required_error: "End date is required." }),
+    endTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, {
+      message: "Invalid time format (HH:mm)",
+    }), // Required HH:mm format
+    location: z.string().optional(),
+    color: z.string().optional(), // Consider adding validation (e.g., hex code regex)
+  })
+  .refine(
+    (data) => {
+      const startDateTime = combineDateAndTime(data.startDate, data.startTime);
+      const endDateTime = combineDateAndTime(data.endDate, data.endTime);
+      return startDateTime && endDateTime && endDateTime >= startDateTime;
+    },
+    {
+      message: "End date/time must be after start date/time.",
+      path: ["endDate"], // Apply error to endDate field
+    }
+  );
 
 type FormData = z.infer<typeof formSchema>;
 
 // Helper function to combine date and time string into a Date object
-// Returns null if timeString is invalid or empty
+// Returns Date object or null if timeString is invalid
 const combineDateAndTime = (
-  date: Date,
+  date: Date | undefined, // Allow date to be potentially undefined initially
   timeString: string | undefined
 ): Date | null => {
-  if (!timeString) return null;
-  const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/; // Basic HH:mm validation
-  if (!timeRegex.test(timeString)) return null;
-
+  if (!date || !timeString) return null; // Return null if date or time is missing
   const [hours, minutes] = timeString.split(":").map(Number);
-  const newDate = new Date(date);
-  newDate.setHours(hours, minutes, 0, 0); // Set hours and minutes, reset seconds/ms
+  const newDate = new Date(date); // Create from valid date
+  newDate.setHours(hours, minutes, 0, 0);
   return newDate;
 };
 
 interface AddEventFormProps {
+  selectableCalendars: Pick<CalendarData, "id" | "name">[]; // Array of available calendars
   onSuccess: () => void; // Callback to close dialog on success
-  defaultDate?: Date; // Optional date to pre-fill
-  // projectIds prop is no longer needed here
+  defaultStartTime?: Date; // Optional date/time to pre-fill start
 }
 
 export default function AddEventForm({
+  selectableCalendars,
   onSuccess,
-  defaultDate,
+  defaultStartTime,
 }: AddEventFormProps) {
-  // Fetch projects for the selector
-  const { data: projects, isLoading: isLoadingProjects } = useProjects();
+  // Use the actual useCreateEvent hook
+  const createEventMutation = useCreateEvent();
+  // Note: The hook's onSuccess/onError defined in useEvents.tsx will handle
+  // query invalidation. We only need the component-level onSuccess for closing the dialog.
 
-  // Use the updated hook (doesn't need projectId initially)
-  const createTaskMutation = useCreateTask({
-    onSuccess: onSuccess,
-  });
+  // Calculate default end time (e.g., 1 hour after default start)
+  const defaultEndTime = defaultStartTime
+    ? new Date(defaultStartTime.getTime() + 60 * 60 * 1000)
+    : undefined;
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      calendarId: selectableCalendars?.[0]?.id ?? undefined, // Default to first available calendar or undefined
       title: "",
       description: "",
-      dueDate: defaultDate ?? undefined,
-      // Pre-fill startTime if defaultDate has a non-midnight hour
-      startTime:
-        defaultDate && defaultDate.getHours() !== 0
-          ? format(defaultDate, "HH:mm")
-          : "",
-      endTime: "", // Keep endTime empty initially
-      projectId: undefined, // Initialize projectId as undefined
+      startDate: defaultStartTime ?? new Date(),
+      startTime: defaultStartTime ? format(defaultStartTime, "HH:mm") : "09:00",
+      endDate: defaultEndTime ?? new Date(),
+      endTime: defaultEndTime ? format(defaultEndTime, "HH:mm") : "10:00",
+      location: "",
+      color: "", // Default color or empty
     },
   });
 
   function onSubmit(values: FormData) {
     console.log("Form submitted:", values);
 
-    // Map FormData to the structure expected by the API payload
-    const apiPayload = {
-      title: values.title,
-      description: values.description ?? "",
-      due_date: values.dueDate.toISOString(),
-      start_time:
-        combineDateAndTime(values.dueDate, values.startTime)?.toISOString() ??
-        null,
-      end_time:
-        combineDateAndTime(values.dueDate, values.endTime)?.toISOString() ??
-        null,
-      // project_id is now part of the form data (values.projectId)
-      label: "", // TODO: Add Label selector
-      priority: "medium", // TODO: Add Priority selector
-      status: "todo",
-    };
+    const startDateTime = combineDateAndTime(
+      values.startDate,
+      values.startTime
+    );
+    const endDateTime = combineDateAndTime(values.endDate, values.endTime);
 
-    // The projectId comes directly from the form values now
-    if (!values.projectId) {
-      // This should be caught by Zod validation, but double-check
-      console.error("Project ID is missing in form values.");
-      // Potentially show a toast error
+    // Should not happen if Zod validation is correct, but good practice
+    if (!startDateTime || !endDateTime) {
+      console.error("Invalid start or end date/time after validation.");
+      // TODO: Show user feedback (e.g., toast)
       return;
     }
 
-    // Call the updated mutation, passing payload and projectId
-    createTaskMutation.mutate({
-      payload: apiPayload,
-      projectId: values.projectId,
+    // Map FormData to the CreateEventPayload structure
+    const apiPayload: CreateEventPayload = {
+      calendar_id: values.calendarId, // Use the selected calendarId from form
+      title: values.title,
+      description: values.description || undefined, // Send undefined if empty
+      start_time: startDateTime.toISOString(),
+      end_time: endDateTime.toISOString(),
+      location: values.location || undefined,
+      color: values.color || undefined,
+    };
+
+    console.log("API Payload:", apiPayload);
+
+    // Call the mutation, passing component-level onSuccess for dialog closing
+    createEventMutation.mutate(apiPayload, {
+      onSuccess: () => {
+        console.log("AddEventForm: Mutation succeeded, calling onSuccess.");
+        onSuccess(); // Close dialog
+      },
+      // onError is handled globally in the hook, but could add specific UI feedback here
     });
-    // onSuccess/onError are handled by the hook's configuration
   }
 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        {/* Calendar Selector */}
         <FormField
           control={form.control}
-          name="title"
+          name="calendarId"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Title</FormLabel>
-              <FormControl>
-                <Input placeholder="Event or Task Title" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="dueDate"
-          render={({ field }) => (
-            <FormItem className="flex flex-col">
-              <FormLabel>Date</FormLabel>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <FormControl>
-                    <Button
-                      variant={"outline"}
-                      className={cn(
-                        "w-full pl-3 text-left font-normal",
-                        !field.value && "text-muted-foreground"
-                      )}
-                    >
-                      {field.value ? (
-                        format(field.value, "PPP") // Example format: Dec 31, 2024
-                      ) : (
-                        <span>Pick a date</span>
-                      )}
-                      <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                    </Button>
-                  </FormControl>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={field.value}
-                    onSelect={field.onChange}
-                    // disabled={(date) => date < new Date("1900-01-01")} // Optional: disable past dates
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        {/* Project Selector */}
-        <FormField
-          control={form.control}
-          name="projectId"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Project</FormLabel>
+              <FormLabel>Calendar</FormLabel>
               <Select
-                onValueChange={(value) => field.onChange(Number(value))} // Ensure value is number
-                defaultValue={field.value?.toString()} // Convert number to string for Select
-                disabled={isLoadingProjects}
+                onValueChange={(value) => field.onChange(Number(value))}
+                defaultValue={field.value?.toString()}
+                disabled={
+                  !selectableCalendars || selectableCalendars.length === 0
+                }
               >
                 <FormControl>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select a project" />
+                    <SelectValue placeholder="Select a calendar" />
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  {isLoadingProjects ? (
-                    <SelectItem value="loading" disabled>
-                      Loading projects...
-                    </SelectItem>
-                  ) : (
-                    projects?.map((project) => (
-                      <SelectItem
-                        key={project.id}
-                        value={project.id.toString()}
-                      >
-                        {project.name}
+                  {selectableCalendars && selectableCalendars.length > 0 ? (
+                    selectableCalendars.map((cal) => (
+                      <SelectItem key={cal.id} value={cal.id.toString()}>
+                        {cal.name}
                       </SelectItem>
                     ))
+                  ) : (
+                    <SelectItem value="loading" disabled>
+                      No calendars available
+                    </SelectItem>
                   )}
                 </SelectContent>
               </Select>
@@ -233,27 +200,67 @@ export default function AddEventForm({
           )}
         />
 
-        {/* Basic Time Inputs (Consider dedicated Time Picker component later) */}
+        {/* Title */}
+        <FormField
+          control={form.control}
+          name="title"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Title</FormLabel>
+              <FormControl>
+                <Input placeholder="Event Title" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {/* Start Date/Time */}
         <div className="grid grid-cols-2 gap-4">
           <FormField
             control={form.control}
-            name="startTime"
+            name="startDate"
             render={({ field }) => (
-              <FormItem>
-                <FormLabel>Start Time (HH:mm)</FormLabel>
-                <FormControl>
-                  <Input type="time" {...field} />
-                </FormControl>
+              <FormItem className="flex flex-col">
+                <FormLabel>Start Date</FormLabel>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <FormControl>
+                      <Button
+                        variant={"outline"}
+                        className={cn(
+                          "w-full pl-3 text-left font-normal",
+                          !field.value && "text-muted-foreground"
+                        )}
+                      >
+                        {field.value ? (
+                          format(field.value, "PPP")
+                        ) : (
+                          <span>Pick a date</span>
+                        )}
+                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                      </Button>
+                    </FormControl>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={field.value}
+                      onSelect={field.onChange}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
                 <FormMessage />
               </FormItem>
             )}
           />
           <FormField
             control={form.control}
-            name="endTime"
+            name="startTime"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>End Time (HH:mm)</FormLabel>
+                <FormLabel>Start Time</FormLabel>
                 <FormControl>
                   <Input type="time" {...field} />
                 </FormControl>
@@ -263,28 +270,118 @@ export default function AddEventForm({
           />
         </div>
 
+        {/* End Date/Time */}
+        <div className="grid grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="endDate"
+            render={({ field }) => (
+              <FormItem className="flex flex-col">
+                <FormLabel>End Date</FormLabel>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <FormControl>
+                      <Button
+                        variant={"outline"}
+                        className={cn(
+                          "w-full pl-3 text-left font-normal",
+                          !field.value && "text-muted-foreground"
+                        )}
+                      >
+                        {field.value ? (
+                          format(field.value, "PPP")
+                        ) : (
+                          <span>Pick a date</span>
+                        )}
+                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                      </Button>
+                    </FormControl>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={field.value}
+                      onSelect={field.onChange}
+                      initialFocus
+                      // Optional: disable dates before start date?
+                    />
+                  </PopoverContent>
+                </Popover>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="endTime"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>End Time</FormLabel>
+                <FormControl>
+                  <Input type="time" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        {/* Location */}
         <FormField
           control={form.control}
-          name="description"
+          name="location"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Description</FormLabel>
+              <FormLabel>Location (Optional)</FormLabel>
               <FormControl>
-                <Textarea placeholder="Optional description..." {...field} />
+                <Input placeholder="e.g., Conference Room A" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
 
-        {/* TODO: Add other fields like Project Selector, Priority, Label etc. */}
+        {/* Color */}
+        <FormField
+          control={form.control}
+          name="color"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Color (Optional)</FormLabel>
+              <FormControl>
+                {/* Basic input for now, could be replaced with a color picker */}
+                <Input type="color" {...field} className="h-10" />
+                {/* <Input placeholder="e.g., #007bff" {...field} /> */}
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {/* Description */}
+        <FormField
+          control={form.control}
+          name="description"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Description (Optional)</FormLabel>
+              <FormControl>
+                <Textarea
+                  placeholder="Add details about the event..."
+                  {...field}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         <Button
           type="submit"
-          disabled={createTaskMutation.isPending}
+          disabled={createEventMutation.isPending}
           className="w-full"
         >
-          {createTaskMutation.isPending ? "Adding..." : "Add Event"}
+          {createEventMutation.isPending ? "Adding Event..." : "Add Event"}
         </Button>
       </form>
     </Form>

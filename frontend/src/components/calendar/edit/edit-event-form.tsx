@@ -25,30 +25,45 @@ import {
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
-import { useUpdateTask } from "@/hooks/useTasks"; // Import update hook
-import { Task } from "@/components/tasks/data/schema"; // Import Task type
+import { useUpdateEvent } from "@/hooks/useEvents"; // Import the actual hook
+import { Event, UpdateEventPayload } from "@/lib/api/events"; // Import event types
 
-// Define the form schema (can be the same as AddEventForm for now)
-const formSchema = z.object({
-  title: z.string().min(1, { message: "Title is required." }),
-  description: z.string().optional(),
-  dueDate: z.date({ required_error: "A due date is required." }),
-  startTime: z.string().optional(), // Optional time string e.g., "14:30"
-  endTime: z.string().optional(), // Optional time string e.g., "15:00"
-  // Add other editable fields if needed
-});
+// Define the form schema using Zod based on UpdateEventPayload
+const formSchema = z
+  .object({
+    title: z.string().min(1, { message: "Title is required." }),
+    description: z.string().optional(),
+    startDate: z.date({ required_error: "Start date is required." }),
+    startTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, {
+      message: "Invalid time format (HH:mm)",
+    }), // Required HH:mm format
+    endDate: z.date({ required_error: "End date is required." }),
+    endTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, {
+      message: "Invalid time format (HH:mm)",
+    }), // Required HH:mm format
+    location: z.string().optional(),
+    color: z.string().optional(), // Consider adding validation (e.g., hex code regex)
+  })
+  .refine(
+    (data) => {
+      const startDateTime = combineDateAndTime(data.startDate, data.startTime);
+      const endDateTime = combineDateAndTime(data.endDate, data.endTime);
+      return startDateTime && endDateTime && endDateTime >= startDateTime;
+    },
+    {
+      message: "End date/time must be after start date/time.",
+      path: ["endDate"], // Apply error to endDate field
+    }
+  );
 
 type FormData = z.infer<typeof formSchema>;
 
-// Helper to combine date and time string into a Date object
+// Helper function to combine date and time string into a Date object
 const combineDateAndTime = (
-  date: Date,
-  timeString: string | undefined | null
+  date: Date | undefined,
+  timeString: string | undefined
 ): Date | null => {
-  if (!timeString) return null;
-  const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/; // Basic HH:mm validation
-  if (!timeRegex.test(timeString)) return null;
-
+  if (!date || !timeString) return null;
   const [hours, minutes] = timeString.split(":").map(Number);
   const newDate = new Date(date);
   newDate.setHours(hours, minutes, 0, 0);
@@ -56,83 +71,109 @@ const combineDateAndTime = (
 };
 
 // Helper to extract HH:mm time from ISO string or Date
-const formatTime = (date: Date | string | null | undefined): string => {
-  if (!date) return "";
+const formatTime = (dateString: string | null | undefined): string => {
+  if (!dateString) return "";
   try {
-    const dateObj = typeof date === "string" ? parseISO(date) : date;
-    return format(dateObj, "HH:mm");
+    return format(parseISO(dateString), "HH:mm");
   } catch (e) {
-    console.error("Error formatting time:", e);
+    console.error("Error formatting time:", dateString, e);
     return "";
   }
 };
 
+// Helper to parse ISO string safely into Date
+const parseDateSafe = (
+  dateString: string | null | undefined
+): Date | undefined => {
+  if (!dateString) return undefined;
+  try {
+    return parseISO(dateString);
+  } catch (e) {
+    console.error("Error parsing date:", dateString, e);
+    return undefined;
+  }
+};
+
 interface EditEventFormProps {
-  task: Task; // The task being edited
+  event: Event; // The event being edited
   onSuccess: () => void; // Callback to close dialog on success
 }
 
-export default function EditEventForm({ task, onSuccess }: EditEventFormProps) {
-  // Assuming projectId is part of the task object passed from backend
-  const updateTaskMutation = useUpdateTask(task.project_id, {
-    onSuccess: onSuccess,
-    // onError handled by hook
-  });
+export default function EditEventForm({
+  event,
+  onSuccess,
+}: EditEventFormProps) {
+  // Use the actual useUpdateEvent hook
+  const updateEventMutation = useUpdateEvent();
+  // Note: The hook's onSuccess/onError defined in useEvents.tsx will handle
+  // query invalidation. We only need the component-level onSuccess for closing the dialog.
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
-    // Pre-fill form with existing task data
+    // Pre-fill form with existing event data
     defaultValues: {
-      title: task.title || "",
-      description: task.description || "",
-      dueDate: task.due_date ? parseISO(task.due_date) : undefined,
-      startTime: formatTime(task.start_time),
-      endTime: formatTime(task.end_time),
+      title: event.title || "",
+      description: event.description || "",
+      startDate: parseDateSafe(event.start_time),
+      startTime: formatTime(event.start_time),
+      endDate: parseDateSafe(event.end_time),
+      endTime: formatTime(event.end_time),
+      location: event.location || "",
+      color: event.color || "", // Default color or empty
     },
   });
 
-  // Reset form if the task prop changes (e.g., opening dialog for a different task)
+  // Reset form if the event prop changes
   useEffect(() => {
     form.reset({
-      title: task.title || "",
-      description: task.description || "",
-      dueDate: task.due_date ? parseISO(task.due_date) : undefined,
-      startTime: formatTime(task.start_time),
-      endTime: formatTime(task.end_time),
+      title: event.title || "",
+      description: event.description || "",
+      startDate: parseDateSafe(event.start_time),
+      startTime: formatTime(event.start_time),
+      endDate: parseDateSafe(event.end_time),
+      endTime: formatTime(event.end_time),
+      location: event.location || "",
+      color: event.color || "",
     });
-  }, [task, form]);
+  }, [event, form]);
 
   function onSubmit(values: FormData) {
     console.log("Edit Form submitted:", values);
 
-    // Map FormData to the UpdateTaskPayload structure
-    const apiPayload = {
+    const startDateTime = combineDateAndTime(
+      values.startDate,
+      values.startTime
+    );
+    const endDateTime = combineDateAndTime(values.endDate, values.endTime);
+
+    if (!startDateTime || !endDateTime) {
+      console.error("Invalid start or end date/time after validation.");
+      // TODO: Show user feedback
+      return;
+    }
+
+    // Map FormData to the UpdateEventPayload structure
+    // Only include fields that were potentially changed
+    const apiPayload: UpdateEventPayload = {
       title: values.title,
-      description: values.description ?? null, // Send null if empty
-      due_date: values.dueDate?.toISOString() ?? null,
-      start_time:
-        combineDateAndTime(values.dueDate, values.startTime)?.toISOString() ??
-        null,
-      end_time:
-        combineDateAndTime(values.dueDate, values.endTime)?.toISOString() ??
-        null,
-      // Include other fields from the original task that aren't edited by this form
-      // but might be required by the UpdateTaskPayload or backend validation
-      // (e.g., status, priority, label might need to be included if not editable here)
-      status: task.status, // Pass existing status
-      priority: task.priority, // Pass existing priority
-      label: task.label ?? null, // Pass existing label
+      description: values.description || undefined,
+      start_time: startDateTime.toISOString(),
+      end_time: endDateTime.toISOString(),
+      location: values.location || undefined,
+      color: values.color || undefined,
     };
 
-    updateTaskMutation.mutate(
-      { taskId: task.id, taskData: apiPayload },
+    console.log("API Payload:", apiPayload);
+
+    updateEventMutation.mutate(
+      { eventId: event.id, payload: apiPayload }, // Use 'payload' key
       {
         onSuccess: () => {
-          console.log("Task updated successfully!");
+          console.log("Event updated successfully!");
           onSuccess(); // Close the dialog
         },
         onError: (error) => {
-          console.error("Failed to update task:", error);
+          console.error("Failed to update event:", error);
           // TODO: Show user-friendly error message
         },
       }
@@ -150,74 +191,59 @@ export default function EditEventForm({ task, onSuccess }: EditEventFormProps) {
             <FormItem>
               <FormLabel>Title</FormLabel>
               <FormControl>
-                <Input placeholder="Event or Task Title" {...field} />
+                <Input placeholder="Event Title" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
 
-        {/* Date Field */}
-        <FormField
-          control={form.control}
-          name="dueDate"
-          render={({ field }) => (
-            <FormItem className="flex flex-col">
-              <FormLabel>Date</FormLabel>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <FormControl>
-                    <Button
-                      variant={"outline"}
-                      className={cn(
-                        "w-full pl-3 text-left font-normal",
-                        !field.value && "text-muted-foreground"
-                      )}
-                    >
-                      {field.value ? (
-                        format(field.value, "PPP")
-                      ) : (
-                        <span>Pick a date</span>
-                      )}
-                      <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                    </Button>
-                  </FormControl>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={field.value}
-                    onSelect={field.onChange}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        {/* Time Fields */}
+        {/* Start Date/Time Fields */}
         <div className="grid grid-cols-2 gap-4">
           <FormField
             control={form.control}
-            name="startTime"
+            name="startDate"
             render={({ field }) => (
-              <FormItem>
-                <FormLabel>Start Time (HH:mm)</FormLabel>
-                <FormControl>
-                  <Input type="time" {...field} />
-                </FormControl>
+              <FormItem className="flex flex-col">
+                <FormLabel>Start Date</FormLabel>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <FormControl>
+                      <Button
+                        variant={"outline"}
+                        className={cn(
+                          "w-full pl-3 text-left font-normal",
+                          !field.value && "text-muted-foreground"
+                        )}
+                      >
+                        {field.value ? (
+                          format(field.value, "PPP")
+                        ) : (
+                          <span>Pick a date</span>
+                        )}
+                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                      </Button>
+                    </FormControl>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={field.value}
+                      onSelect={field.onChange}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
                 <FormMessage />
               </FormItem>
             )}
           />
           <FormField
             control={form.control}
-            name="endTime"
+            name="startTime"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>End Time (HH:mm)</FormLabel>
+                <FormLabel>Start Time</FormLabel>
                 <FormControl>
                   <Input type="time" {...field} />
                 </FormControl>
@@ -227,16 +253,71 @@ export default function EditEventForm({ task, onSuccess }: EditEventFormProps) {
           />
         </div>
 
-        {/* Description Field */}
+        {/* End Date/Time Fields */}
+        <div className="grid grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="endDate"
+            render={({ field }) => (
+              <FormItem className="flex flex-col">
+                <FormLabel>End Date</FormLabel>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <FormControl>
+                      <Button
+                        variant={"outline"}
+                        className={cn(
+                          "w-full pl-3 text-left font-normal",
+                          !field.value && "text-muted-foreground"
+                        )}
+                      >
+                        {field.value ? (
+                          format(field.value, "PPP")
+                        ) : (
+                          <span>Pick a date</span>
+                        )}
+                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                      </Button>
+                    </FormControl>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={field.value}
+                      onSelect={field.onChange}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="endTime"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>End Time</FormLabel>
+                <FormControl>
+                  <Input type="time" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        {/* Location */}
         <FormField
           control={form.control}
-          name="description"
+          name="location"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Description</FormLabel>
+              <FormLabel>Location (Optional)</FormLabel>
               <FormControl>
-                <Textarea
-                  placeholder="Optional description..."
+                <Input
+                  placeholder="e.g., Conference Room A"
                   {...field}
                   value={field.value ?? ""}
                 />
@@ -246,14 +327,51 @@ export default function EditEventForm({ task, onSuccess }: EditEventFormProps) {
           )}
         />
 
-        {/* TODO: Add other editable fields if needed */}
+        {/* Color */}
+        <FormField
+          control={form.control}
+          name="color"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Color (Optional)</FormLabel>
+              <FormControl>
+                <Input
+                  type="color"
+                  {...field}
+                  className="h-10"
+                  value={field.value ?? "#000000"}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {/* Description Field */}
+        <FormField
+          control={form.control}
+          name="description"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Description (Optional)</FormLabel>
+              <FormControl>
+                <Textarea
+                  placeholder="Add details about the event..."
+                  {...field}
+                  value={field.value ?? ""}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         <Button
           type="submit"
-          disabled={updateTaskMutation.isPending}
+          disabled={updateEventMutation.isPending}
           className="w-full"
         >
-          {updateTaskMutation.isPending ? "Saving..." : "Save Changes"}
+          {updateEventMutation.isPending ? "Saving Changes..." : "Save Changes"}
         </Button>
       </form>
     </Form>

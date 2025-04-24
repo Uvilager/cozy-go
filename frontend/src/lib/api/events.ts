@@ -83,6 +83,77 @@ export const getEventsByCalendar = async (
 };
 
 /**
+ * Fetches events for multiple calendars within a specific time range from the API.
+ * @param calendarIds An array of calendar IDs whose events are to be fetched.
+ * @param startTime The start of the time range (ISO 8601 string).
+ * @param endTime The end of the time range (ISO 8601 string).
+ * @param token Optional auth token for server-side requests.
+ * @returns A promise that resolves to an array of events.
+ */
+export const getEventsByCalendarIDs = async (
+  calendarIds: number[],
+  startTime: string,
+  endTime: string,
+  token?: string
+): Promise<Event[]> => {
+  // Basic validation
+  if (!calendarIds || calendarIds.length === 0) {
+    console.warn("API: At least one Calendar ID is required to fetch events.");
+    return [];
+  }
+  if (!startTime || !endTime) {
+    console.warn("API: Start and end times are required to fetch events.");
+    return [];
+  }
+
+  // Declare variable outside the try block for wider scope
+  let calendarIdsString = ""; // Initialize
+
+  try {
+    calendarIdsString = calendarIds.join(","); // Assign value inside try block
+    console.log(
+      `API: Fetching events for calendars [${calendarIdsString}] between ${startTime} and ${endTime}...`
+    );
+
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    const params = {
+      calendar_ids: calendarIdsString,
+      start: startTime,
+      end: endTime,
+    };
+
+    // Use eventAxiosInstance and the updated endpoint with query params
+    const response = await eventAxiosInstance.get<Event[]>(
+      `/events`, // Endpoint changed to /events
+      { params, headers }
+    );
+
+    if (response.status !== 200) {
+      console.warn(
+        `API: Unexpected status code ${response.status} fetching events for calendars [${calendarIdsString}].`
+      );
+      return [];
+    }
+
+    console.log(
+      `API: Events for calendars [${calendarIdsString}] fetched successfully:`,
+      response.data
+    );
+    return Array.isArray(response.data) ? response.data : [];
+  } catch (error) {
+    console.error(
+      `API Error fetching events for calendars [${calendarIdsString}]:`,
+      error
+    );
+    throw error; // Re-throw the error for react-query to handle
+  }
+};
+
+/**
  * Creates a new event.
  * Note: The backend handler likely extracts calendar_id from the payload or context.
  * @param eventData The data for the new event.

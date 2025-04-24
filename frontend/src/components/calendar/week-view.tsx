@@ -11,88 +11,100 @@ import {
   getHours, // Import getHours
 } from "date-fns";
 import { cn } from "@/lib/utils";
-import { useTasks } from "@/hooks/useTasks"; // Import the updated hook
-import { Task } from "../tasks/data/schema";
-import TaskDetailDialog from "./task-detail-dialog";
+// TODO: Verify paths
+import { useEvents } from "@/hooks/useEvents"; // Import event hook
+import { Event } from "@/lib/api/events"; // Import Event type
+import EventDetailDialog from "./event-detail-dialog"; // Import event dialog
 
 interface WeekViewProps {
   currentDate: Date;
   onTimeSlotClick?: (date: Date) => void; // Callback for clicking an empty slot
-  projectIds: number[]; // Add projectId prop
+  calendarIds: number[]; // Changed from projectIds
 }
 
 export default function WeekView({
   currentDate,
   onTimeSlotClick,
-  projectIds, // Destructure projectId
+  calendarIds, // Use calendarIds
 }: WeekViewProps) {
-  // --- Data Fetching ---
-  // Use the projectIds array passed from props with the updated useTasks hook
-  const { data: tasks, isLoading, error } = useTasks(projectIds);
-
-  // --- State for Task Detail/Edit ---
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-  const [isDetailOpen, setIsDetailOpen] = useState(false);
-
+  // --- Calculate Time Range ---
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
+
+  // --- Data Fetching ---
+  // Fetch events for the current week using the updated hook
+  const {
+    data: events,
+    isLoading,
+    error,
+  } = useEvents(calendarIds, weekStart, weekEnd);
+
+  // --- State for Event Detail/Edit ---
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null); // Use Event type
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
+
+  // Remove duplicate weekEnd declaration
+  // const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
   const days = eachDayOfInterval({ start: weekStart, end: weekEnd });
   const hours = Array.from({ length: 24 }, (_, i) => i);
 
-  // --- Group tasks by DATE and then by START HOUR ---
-  const tasksByHourAndDay = useMemo(() => {
-    const grouped: Record<string, Record<number, Task[]>> = {}; // Key1: yyyy-MM-dd, Key2: hour (0-23)
-    if (!tasks) return grouped;
+  // --- Group events by DATE and then by START HOUR ---
+  const eventsByHourAndDay = useMemo(() => {
+    const grouped: Record<string, Record<number, Event[]>> = {}; // Use Event type
+    if (!events) return grouped; // Use events data
 
-    tasks.forEach((task) => {
-      const dateToSortBy = task.start_time || task.due_date;
-      if (dateToSortBy) {
+    events.forEach((event) => {
+      // Iterate over events
+      // Use start_time for grouping events
+      if (event.start_time) {
         try {
-          const dateObj = parseISO(dateToSortBy);
+          const dateObj = parseISO(event.start_time); // Use event.start_time
           const dateKey = format(dateObj, "yyyy-MM-dd");
-          const startHour = task.start_time
-            ? getHours(parseISO(task.start_time))
-            : -1; // Use -1 for tasks without start time (all-day?)
+          const startHour = getHours(dateObj); // Get hour directly from parsed date
 
           if (!grouped[dateKey]) {
             grouped[dateKey] = {};
           }
-          if (startHour >= 0) {
-            // Only group timed tasks by hour
-            if (!grouped[dateKey][startHour]) {
-              grouped[dateKey][startHour] = [];
-            }
-            grouped[dateKey][startHour].push(task);
-            // Sort tasks within the hour
-            grouped[dateKey][startHour].sort((a, b) => {
-              const timeA = a.start_time ? parseISO(a.start_time).getTime() : 0;
-              const timeB = b.start_time ? parseISO(b.start_time).getTime() : 0;
-              return timeA - timeB;
-            });
+          // Group all events by hour, including those potentially starting at 00:00
+          if (!grouped[dateKey][startHour]) {
+            grouped[dateKey][startHour] = [];
           }
-          // TODO: Handle tasks without start_time separately if needed (e.g., all-day section)
+          grouped[dateKey][startHour].push(event); // Push event
+
+          // Sort events within the hour by start time
+          grouped[dateKey][startHour].sort((a, b) => {
+            // Assuming start_time is always present here based on outer check
+            const timeA = parseISO(a.start_time).getTime();
+            const timeB = parseISO(b.start_time).getTime();
+            return timeA - timeB;
+          });
+
+          // TODO: Handle all-day events (events without start_time or spanning full days) separately if needed
         } catch (e) {
           console.error(
-            "Error parsing task date for grouping:",
-            dateToSortBy,
+            "Error parsing event start_time for grouping:",
+            event.start_time,
             e
           );
         }
       }
     });
     return grouped;
-  }, [tasks]);
+  }, [events]); // Depend on events
 
-  const handleTaskClick = (task: Task) => {
-    setSelectedTask(task);
+  // Rename and update handler for clicking an event
+  const handleEventClick = (event: Event) => {
+    setSelectedEvent(event); // Use setSelectedEvent
     setIsDetailOpen(true);
   };
 
-  if (isLoading) return <div className="p-4 text-center">Loading tasks...</div>;
+  // Update loading/error messages
+  if (isLoading)
+    return <div className="p-4 text-center">Loading events...</div>;
   if (error)
     return (
       <div className="p-4 text-center text-destructive">
-        Error loading tasks: {error.message}
+        Error loading events: {error.message}
       </div>
     );
 
@@ -140,16 +152,18 @@ export default function WeekView({
             {/* Day Columns */}
             {days.map((day) => {
               const dayKey = format(day, "yyyy-MM-dd");
-              const tasksForDay = tasksByHourAndDay[dayKey] || {}; // Get tasks grouped by hour for this day
+              // Use eventsByHourAndDay
+              const eventsForDay = eventsByHourAndDay[dayKey] || {};
 
               return (
                 <div
                   key={`day-col-${day.toISOString()}`}
                   className="relative border-r last:border-r-0"
                 >
-                  {/* Render hour slots and tasks within them */}
+                  {/* Render hour slots and events within them */}
                   {hours.map((hour) => {
-                    const tasksInHour = tasksForDay[hour] || []; // Get tasks for this specific hour
+                    // Use eventsForDay
+                    const eventsInHour = eventsForDay[hour] || [];
                     return (
                       <div
                         key={`cell-${day.toISOString()}-${hour}`}
@@ -160,39 +174,38 @@ export default function WeekView({
                           onTimeSlotClick?.(clickedDateTime);
                         }}
                       >
-                        {/* Render tasks starting in this hour */}
-                        {tasksInHour.map((task) => (
-                          <div
-                            key={task.id}
-                            className="group relative flex items-center text-xs bg-primary/10 dark:bg-primary/30 text-primary-foreground rounded px-1 truncate cursor-pointer hover:bg-primary/20 dark:hover:bg-primary/40"
-                            title={task.title}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleTaskClick(task);
-                            }}
-                          >
-                            {/* Priority Indicator */}
-                            {task.priority === "high" && (
-                              <span className="mr-1 h-1.5 w-1.5 rounded-full bg-red-500 flex-shrink-0"></span>
-                            )}
-                            {task.priority === "medium" && (
-                              <span className="mr-1 h-1.5 w-1.5 rounded-full bg-yellow-500 flex-shrink-0"></span>
-                            )}
-                            {task.priority === "low" && (
-                              <span className="mr-1 h-1.5 w-1.5 rounded-full bg-green-500 flex-shrink-0"></span>
-                            )}
-                            {/* Time */}
-                            <span className="mr-1 flex-shrink-0">
-                              {task.start_time
-                                ? format(parseISO(task.start_time), "HH:mm")
-                                : ""}
-                            </span>
-                            {/* Title */}
-                            <span className="flex-grow truncate">
-                              {task.title}
-                            </span>
-                          </div>
-                        ))}
+                        {/* Render events starting in this hour */}
+                        {eventsInHour.map(
+                          (
+                            event // Iterate over events
+                          ) => (
+                            <div
+                              key={event.id} // Use event.id
+                              className="group relative flex items-center text-xs bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 rounded px-1 truncate cursor-pointer hover:bg-blue-200 dark:hover:bg-blue-800/60" // Adjusted styling
+                              title={event.title} // Use event.title
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEventClick(event); // Use handleEventClick
+                              }}
+                            >
+                              {/* Remove Priority Indicator */}
+                              {/* Time */}
+                              <span className="mr-1 flex-shrink-0">
+                                {" "}
+                                {/* Display event time */}
+                                {event.start_time
+                                  ? format(parseISO(event.start_time), "HH:mm")
+                                  : "All Day"}
+                              </span>
+                              {/* Title */}
+                              <span className="flex-grow truncate">
+                                {" "}
+                                {/* Display event title */}
+                                {event.title}
+                              </span>
+                            </div>
+                          )
+                        )}
                       </div>
                     );
                   })}
@@ -203,12 +216,12 @@ export default function WeekView({
           </div>
         </div>
       </div>
-      {/* Render the Task Detail Dialog */}
-      <TaskDetailDialog
-        task={selectedTask}
+      {/* Render the Event Detail Dialog */}
+      <EventDetailDialog // Use EventDetailDialog
+        event={selectedEvent} // Pass selectedEvent
         isOpen={isDetailOpen}
         onClose={() => setIsDetailOpen(false)}
-        // No projectId prop needed here anymore
+        // Pass other necessary props
       />
     </>
   );

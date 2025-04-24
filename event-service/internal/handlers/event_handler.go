@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings" // Added strings import
 	"time"
 
 	// "github.com/jackc/pgx/v5" // For checking specific DB errors like ErrNoRows
@@ -121,18 +122,34 @@ func (h *EventHandler) ListEventsByCalendar(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	calendarIDStr := r.PathValue("calendarID") // Requires Go 1.22+ router or equivalent logic
-	if calendarIDStr == "" {
-		http.Error(w, "Missing calendar ID in path", http.StatusBadRequest)
-		return
-	}
-	calendarID, err := strconv.Atoi(calendarIDStr)
-	if err != nil {
-		http.Error(w, "Invalid calendar ID format", http.StatusBadRequest)
+	// --- Get Calendar IDs from Query Parameter ---
+	// Expecting ?calendar_ids=1,2,3
+	calendarIDsStr := r.URL.Query().Get("calendar_ids")
+	if calendarIDsStr == "" {
+		http.Error(w, "Missing required query parameter: calendar_ids", http.StatusBadRequest)
 		return
 	}
 
-	// Get time range from query parameters (e.g., ?start=...&end=...)
+	// Parse comma-separated IDs
+	idsStrSlice := strings.Split(calendarIDsStr, ",")
+	calendarIDs := make([]int, 0, len(idsStrSlice))
+	for _, idStr := range idsStrSlice {
+		id, err := strconv.Atoi(strings.TrimSpace(idStr))
+		if err != nil {
+			http.Error(w, "Invalid calendar ID format in calendar_ids parameter", http.StatusBadRequest)
+			return
+		}
+		if id > 0 { // Basic validation: ensure ID is positive
+			calendarIDs = append(calendarIDs, id)
+		}
+	}
+
+	if len(calendarIDs) == 0 {
+		http.Error(w, "No valid calendar IDs provided in calendar_ids parameter", http.StatusBadRequest)
+		return
+	}
+
+	// --- Get Time Range ---
 	// Use RFC3339 format (e.g., 2023-10-27T10:00:00Z)
 	startStr := r.URL.Query().Get("start")
 	endStr := r.URL.Query().Get("end")
@@ -158,11 +175,13 @@ func (h *EventHandler) ListEventsByCalendar(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// TODO: Add validation to ensure the user owns the target CalendarID
+	// TODO: Add validation to ensure the user owns ALL target CalendarIDs
 
-	events, err := h.repo.ListEventsByCalendar(r.Context(), calendarID, userID, startTime, endTime)
+	// Call repository method with the slice of IDs
+	// Note: The repository method signature needs to be updated as well
+	events, err := h.repo.ListEventsByCalendarIDs(r.Context(), calendarIDs, userID, startTime, endTime) // Renamed repo method for clarity
 	if err != nil {
-		log.Printf("Error listing events for calendar %d: %v", calendarID, err)
+		log.Printf("Error listing events for calendars %v: %v", calendarIDs, err) // Log the slice
 		http.Error(w, "Failed to list events", http.StatusInternalServerError)
 		return
 	}

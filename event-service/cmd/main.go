@@ -9,8 +9,9 @@ import (
 
 	"github.com/your-username/cozy-go/event-service/internal/database" // Adjust import path
 	"github.com/your-username/cozy-go/event-service/internal/handlers" // Adjust import path
-	"github.com/your-username/cozy-go/event-service/internal/routes"   // Adjust import path
-	"github.com/your-username/cozy-go/event-service/repository"        // Adjust import path
+	"github.com/your-username/cozy-go/event-service/internal/middleware"
+	"github.com/your-username/cozy-go/event-service/internal/routes" // Adjust import path
+	"github.com/your-username/cozy-go/event-service/repository"      // Adjust import path
 )
 
 func main() {
@@ -39,13 +40,16 @@ func main() {
 	// Setup Routes
 	router := routes.SetupRoutes(eventHandler)
 
+	corsHandler := middleware.EnableCORS(router) // Apply CORS to the main mux
+
+
 	// Start Server
 	serverAddr := ":" + port
 	log.Printf("Event service starting on port %s\n", port)
 
 	server := &http.Server{
 		Addr:    serverAddr,
-		Handler: router, // Use the router from routes package
+		Handler: corsHandler, // Use the router from routes package
 		// Add timeouts later for production hardening
 		// ReadTimeout:  5 * time.Second,
 		// WriteTimeout: 10 * time.Second,

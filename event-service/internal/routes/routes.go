@@ -24,7 +24,8 @@ func SetupRoutes(eventHandler *handlers.EventHandler) http.Handler {
 	// Create a sub-router or group for routes requiring authentication
 	// Here, we apply the middleware directly to each protected handler function.
 	mux.Handle("POST /events", middleware.AuthMiddleware(http.HandlerFunc(eventHandler.CreateEvent)))
-	mux.Handle("GET /calendars/{calendarID}/events", middleware.AuthMiddleware(http.HandlerFunc(eventHandler.ListEventsByCalendar)))
+	// Changed route: Removed /calendars/{calendarID}, handler now uses ?calendar_ids=... query param
+	mux.Handle("GET /events", middleware.AuthMiddleware(http.HandlerFunc(eventHandler.ListEventsByCalendar)))
 	mux.Handle("GET /events/{eventID}", middleware.AuthMiddleware(http.HandlerFunc(eventHandler.GetEvent)))
 	mux.Handle("PUT /events/{eventID}", middleware.AuthMiddleware(http.HandlerFunc(eventHandler.UpdateEvent)))
 	mux.Handle("DELETE /events/{eventID}", middleware.AuthMiddleware(http.HandlerFunc(eventHandler.DeleteEvent)))

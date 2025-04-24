@@ -4,90 +4,89 @@ import React, { useState, useMemo, useEffect } from "react";
 import {
   format,
   parseISO,
-  isSameDay,
   isToday as isTodayCheck,
   getHours,
+  startOfDay, // Import startOfDay
+  endOfDay, // Import endOfDay
 } from "date-fns";
-import { useTasks } from "@/hooks/useTasks"; // Import the updated hook
-import { Task } from "../tasks/data/schema";
-import TaskDetailDialog from "./task-detail-dialog";
+// TODO: Verify paths
+import { useEvents } from "@/hooks/useEvents";
+import { Event } from "@/lib/api/events";
+import EventDetailDialog from "./event-detail-dialog";
 
 interface DayViewProps {
   currentDate: Date; // The specific day to display
   onTimeSlotClick?: (date: Date) => void; // Callback for clicking an empty slot
-  projectIds: number[]; // Add projectId prop
+  calendarIds: number[]; // Changed from projectIds
 }
 
 export default function DayView({
   currentDate,
   onTimeSlotClick,
-  projectIds, // Destructure projectId
+  calendarIds, // Use calendarIds
 }: DayViewProps) {
-  // --- State & Data Fetching ---
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  // --- State ---
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null); // Use Event type
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+
+  // --- Calculate Time Range for the Day ---
+  const dayStart = startOfDay(currentDate);
+  const dayEnd = endOfDay(currentDate);
+
   // --- Data Fetching ---
-  // Use the projectIds array passed from props with the updated useTasks hook
-  const { data: allTasks, isLoading, error } = useTasks(projectIds);
+  // Fetch events for the current day using the updated hook
+  const {
+    data: events,
+    isLoading,
+    error,
+  } = useEvents(calendarIds, dayStart, dayEnd);
 
   // --- Calendar Calculations ---
   const hours = Array.from({ length: 24 }, (_, i) => i); // 0 to 23
 
-  // --- Filter tasks for the current day ---
-  const dayTasks = useMemo(() => {
-    if (!allTasks) return [];
-    return allTasks
-      .filter((task) => {
-        const dateToSortBy = task.start_time || task.due_date;
-        if (!dateToSortBy) return false;
-        try {
-          return isSameDay(parseISO(dateToSortBy), currentDate);
-        } catch (e) {
-          console.error(
-            "Error parsing task date for filtering:",
-            dateToSortBy,
-            e
-          );
-          return false;
-        }
-      })
-      .sort((a, b) => {
-        const timeA = a.start_time ? parseISO(a.start_time).getTime() : 0;
-        const timeB = b.start_time ? parseISO(b.start_time).getTime() : 0;
-        return timeA - timeB;
-      });
-  }, [allTasks, currentDate]);
+  // --- Filter events for the current day (already done by useEvents hook) ---
+  // The useEvents hook now fetches only events for the specified day (dayStart to dayEnd)
+  // We just need to sort them if needed (though API might already sort)
+  const dayEvents = useMemo(() => {
+    if (!events) return [];
+    // Sort by start time just in case API doesn't guarantee order
+    return [...events].sort((a, b) => {
+      const timeA = a.start_time ? parseISO(a.start_time).getTime() : 0;
+      const timeB = b.start_time ? parseISO(b.start_time).getTime() : 0;
+      return timeA - timeB;
+    });
+  }, [events]);
 
-  // --- Group tasks by START HOUR ---
-  const tasksByHour = useMemo(() => {
-    const grouped: Record<number, Task[]> = {}; // Key is hour (0-23)
-    dayTasks.forEach((task) => {
-      if (task.start_time) {
-        // Only group tasks with a start time
+  // --- Group events by START HOUR ---
+  const eventsByHour = useMemo(() => {
+    const grouped: Record<number, Event[]> = {}; // Use Event type
+    dayEvents.forEach((event) => {
+      // Use dayEvents
+      if (event.start_time) {
+        // Only group events with a start time
         try {
-          const startHour = getHours(parseISO(task.start_time));
+          const startHour = getHours(parseISO(event.start_time));
           if (!grouped[startHour]) {
             grouped[startHour] = [];
           }
-          grouped[startHour].push(task);
-          // Sorting is already handled by dayTasks sort
+          grouped[startHour].push(event); // Push event
+          // Sorting is handled by dayEvents sort
         } catch (e) {
           console.error(
-            "Error parsing task start_time for grouping:",
-            task.start_time,
+            "Error parsing event start_time for grouping:",
+            event.start_time,
             e
           );
         }
       }
-      // Decide how to handle tasks without start_time (e.g., all-day tasks)
-      // Maybe group them under a special key like -1? For now, they are ignored by this grouping.
+      // TODO: Handle all-day events if needed
     });
     return grouped;
-  }, [dayTasks]);
+  }, [dayEvents]); // Depend on dayEvents
 
   // --- Handlers ---
-  const handleTaskClick = (task: Task) => {
-    setSelectedTask(task);
+  const handleEventClick = (event: Event) => {
+    setSelectedEvent(event);
     setIsDetailOpen(true);
   };
 
@@ -115,13 +114,14 @@ export default function DayView({
   }, [currentDate, isCurrentDayDisplayed]);
 
   // --- Rendering ---
+  // Update loading/error messages
   if (isLoading) {
-    return <div className="p-4 text-center">Loading tasks...</div>;
+    return <div className="p-4 text-center">Loading events...</div>;
   }
   if (error) {
     return (
       <div className="p-4 text-center text-destructive">
-        Error loading tasks: {error.message}
+        Error loading events: {error.message}
       </div>
     );
   }
@@ -157,9 +157,9 @@ export default function DayView({
                 </div>
               )}
 
-              {/* Hour slots - Render tasks within each slot */}
+              {/* Hour slots - Render events within each slot */}
               {hours.map((hour) => {
-                const tasksInHour = tasksByHour[hour] || [];
+                const eventsInHour = eventsByHour[hour] || [];
                 return (
                   <div
                     key={`cell-${hour}`}
@@ -170,39 +170,30 @@ export default function DayView({
                       onTimeSlotClick?.(clickedDateTime);
                     }}
                   >
-                    {/* Render tasks starting in this hour */}
+                    {/* Render events starting in this hour */}
                     <div className="p-1 space-y-0.5">
                       {" "}
-                      {/* Container for tasks in this slot */}
-                      {tasksInHour.map((task) => (
+                      {/* Container for events in this slot */}
+                      {eventsInHour.map((event) => (
                         <div
-                          key={task.id}
+                          key={event.id}
                           className="group relative flex items-center text-xs bg-primary/10 dark:bg-primary/30 text-primary-foreground rounded px-1 truncate cursor-pointer hover:bg-primary/20 dark:hover:bg-primary/40"
-                          title={task.title}
+                          title={event.title}
                           onClick={(e) => {
                             e.stopPropagation(); // Prevent slot click
-                            handleTaskClick(task);
+                            handleEventClick(event); // Use handleEventClick
                           }}
                         >
-                          {/* Priority Indicator */}
-                          {task.priority === "high" && (
-                            <span className="mr-1 h-1.5 w-1.5 rounded-full bg-red-500 flex-shrink-0"></span>
-                          )}
-                          {task.priority === "medium" && (
-                            <span className="mr-1 h-1.5 w-1.5 rounded-full bg-yellow-500 flex-shrink-0"></span>
-                          )}
-                          {task.priority === "low" && (
-                            <span className="mr-1 h-1.5 w-1.5 rounded-full bg-green-500 flex-shrink-0"></span>
-                          )}
+                          {/* TODO: Add event-specific indicators if needed (e.g., color based on calendar) */}
                           {/* Time */}
                           <span className="mr-1 flex-shrink-0">
-                            {task.start_time
-                              ? format(parseISO(task.start_time), "HH:mm")
+                            {event.start_time
+                              ? format(parseISO(event.start_time), "HH:mm")
                               : ""}
                           </span>
                           {/* Title */}
                           <span className="flex-grow truncate">
-                            {task.title}
+                            {event.title}
                           </span>
                         </div>
                       ))}
@@ -215,12 +206,11 @@ export default function DayView({
           </div>
         </div>
       </div>
-      {/* Render the Task Detail Dialog */}
-      <TaskDetailDialog
-        task={selectedTask}
+      {/* Render the Event Detail Dialog */}
+      <EventDetailDialog
+        event={selectedEvent} // Pass selectedEvent
         isOpen={isDetailOpen}
         onClose={() => setIsDetailOpen(false)}
-        // No projectId prop needed here anymore
       />
     </>
   );

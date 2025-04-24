@@ -12,14 +12,15 @@ import {
   isToday,
 } from "date-fns";
 import { cn } from "@/lib/utils";
-import { useTasks } from "@/hooks/useTasks"; // Import the updated hook
-import { Task } from "../tasks/data/schema"; // Import Task type
-import TaskDetailDialog from "./task-detail-dialog"; // Import the dialog component
+// TODO: Verify path for useEvents hook and Event type
+import { useEvents } from "@/hooks/useEvents"; // Import event hook
+import { Event } from "@/lib/api/events"; // Import Event type (adjust path if needed)
+import EventDetailDialog from "./event-detail-dialog"; // Import event dialog (adjust path if needed)
 
 interface MonthViewProps {
   currentDate: Date; // First day of the month to display
   onDayClick?: (date: Date) => void; // Add callback for clicking a day cell
-  projectIds: number[]; // Changed from projectId to projectIds array
+  calendarIds: number[]; // Changed from projectIds to calendarIds array
 }
 
 // Helper to get days for the calendar grid
@@ -35,59 +36,75 @@ const getCalendarDays = (monthDate: Date) => {
 export default function MonthView({
   currentDate,
   onDayClick,
-  projectIds, // Use projectIds prop
+  calendarIds, // Use calendarIds prop
 }: MonthViewProps) {
-  // --- Data Fetching ---
-  // Use the projectIds array passed from props with the updated useTasks hook
-  const { data: tasks, isLoading, error } = useTasks(projectIds);
+  // --- Calculate Time Range for the Grid ---
+  const monthStart = startOfMonth(currentDate);
+  const monthEnd = endOfMonth(currentDate);
+  const gridStartDate = startOfWeek(monthStart, { weekStartsOn: 1 }); // Week starts Monday
+  const gridEndDate = endOfWeek(monthEnd, { weekStartsOn: 1 });
 
-  // --- State for Task Detail/Edit ---
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  // --- Data Fetching ---
+  // Pass calendarIds and the calculated time range to the hook
+  const {
+    data: events,
+    isLoading,
+    error,
+  } = useEvents(calendarIds, gridStartDate, gridEndDate); // Fetch events
+
+  // --- State for Event Detail/Edit ---
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null); // Use Event type
   const [isDetailOpen, setIsDetailOpen] = useState(false);
 
   // --- Calendar Grid Calculation ---
   const daysInGrid = getCalendarDays(currentDate);
   const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-  // --- Group tasks by date for easier rendering ---
-  // Create a map where key is date string (YYYY-MM-DD) and value is array of tasks
-  const tasksByDate = React.useMemo(() => {
-    const grouped: Record<string, Task[]> = {};
-    if (!tasks) return grouped;
+  // --- Group events by date for easier rendering ---
+  // Create a map where key is date string (YYYY-MM-DD) and value is array of events
+  const eventsByDate = React.useMemo(() => {
+    const grouped: Record<string, Event[]> = {}; // Use Event type
+    if (!events) return grouped; // Use events data
 
-    tasks.forEach((task) => {
-      // Use due_date for grouping for now. Adapt if using start_time later.
-      if (task.due_date) {
+    events.forEach((event) => {
+      // Iterate over events
+      // Use start_time for grouping events. Adjust if needed.
+      if (event.start_time) {
         try {
-          const dateKey = format(new Date(task.due_date), "yyyy-MM-dd");
+          // TODO: Confirm event.start_time is a valid date string or Date object
+          const dateKey = format(new Date(event.start_time), "yyyy-MM-dd");
           if (!grouped[dateKey]) {
             grouped[dateKey] = [];
           }
-          grouped[dateKey].push(task);
+          grouped[dateKey].push(event); // Push event
         } catch (e) {
-          console.error("Error parsing task due_date:", task.due_date, e);
+          console.error("Error parsing event start_time:", event.start_time, e);
         }
       }
+      // TODO: Handle events without start_time? Or all-day events?
     });
     return grouped;
-  }, [tasks]);
+  }, [events]); // Dependency is events
 
-  // --- Handler for clicking a task ---
-  const handleTaskClick = (task: Task) => {
-    console.log("Task clicked:", task);
-    setSelectedTask(task);
+  // --- Handler for clicking an event ---
+  const handleEventClick = (event: Event) => {
+    // Use Event type
+    console.log("Event clicked:", event);
+    setSelectedEvent(event); // Use setSelectedEvent
     setIsDetailOpen(true);
-    // TODO: Implement Task Detail Dialog/Modal component here
+    // Event Detail Dialog will be rendered below
   };
 
   // --- Rendering ---
   if (isLoading) {
-    return <div className="p-4 text-center">Loading tasks...</div>;
+    // Update loading message
+    return <div className="p-4 text-center">Loading events...</div>;
   }
   if (error) {
+    // Update error message
     return (
       <div className="p-4 text-center text-destructive">
-        Error loading tasks: {error.message}
+        Error loading events: {error.message}
       </div>
     );
   }
@@ -128,44 +145,42 @@ export default function MonthView({
               {format(day, "d")}
             </span>
             <div className="flex-1 overflow-y-auto mt-1 space-y-0.5">
-              {/* Render tasks for this day */}
-              {(tasksByDate[format(day, "yyyy-MM-dd")] || []).map((task) => (
-                <div
-                  key={task.id}
-                  className="group relative flex items-center text-xs bg-primary/10 dark:bg-primary/30 text-primary-foreground rounded px-1 py-0.5 truncate cursor-pointer hover:bg-primary/20 dark:hover:bg-primary/40"
-                  title={task.title} // Show full title on hover
-                  onClick={(e) => {
-                    e.stopPropagation(); // Prevent day click handler when clicking task
-                    handleTaskClick(task);
-                  }}
-                >
-                  {/* Simple Priority Indicator (e.g., colored dot) - Customize as needed */}
-                  {task.priority === "high" && (
-                    <span className="mr-1 h-1.5 w-1.5 rounded-full bg-red-500 flex-shrink-0"></span>
-                  )}
-                  {task.priority === "medium" && (
-                    <span className="mr-1 h-1.5 w-1.5 rounded-full bg-yellow-500 flex-shrink-0"></span>
-                  )}
-                  {task.priority === "low" && (
-                    <span className="mr-1 h-1.5 w-1.5 rounded-full bg-green-500 flex-shrink-0"></span>
-                  )}
+              {/* Render events for this day */}
+              {(eventsByDate[format(day, "yyyy-MM-dd")] || []).map(
+                (
+                  event // Use eventsByDate and event
+                ) => (
+                  <div
+                    key={event.id} // Use event.id
+                    className="group relative flex items-center text-xs bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 rounded px-1 py-0.5 truncate cursor-pointer hover:bg-blue-200 dark:hover:bg-blue-800/60" // Adjusted styling for events
+                    title={event.title} // Show full title on hover
+                    onClick={(e) => {
+                      e.stopPropagation(); // Prevent day click handler when clicking event
+                      handleEventClick(event); // Use handleEventClick
+                    }}
+                  >
+                    {/* Remove Priority Indicator */}
 
-                  {/* Time */}
-                  <span className="mr-1 flex-shrink-0">
-                    {task.start_time
-                      ? format(new Date(task.start_time), "HH:mm")
-                      : ""}
-                  </span>
+                    {/* Time */}
+                    <span className="mr-1 flex-shrink-0">
+                      {/* TODO: Confirm event.start_time format and handle potential errors */}
+                      {
+                        event.start_time
+                          ? format(new Date(event.start_time), "HH:mm")
+                          : "All Day" /* Placeholder for all-day events */
+                      }
+                    </span>
 
-                  {/* Title */}
-                  <span className="flex-grow truncate">{task.title}</span>
+                    {/* Title */}
+                    <span className="flex-grow truncate">{event.title}</span>
 
-                  {/* Optional: Label Badge (keep it small) - shown on hover? */}
-                  {/* <Badge variant="secondary" className="absolute right-1 top-1/2 -translate-y-1/2 scale-75 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {/* Remove Task-specific badge */}
+                    {/* <Badge variant="secondary" className="absolute right-1 top-1/2 -translate-y-1/2 scale-75 opacity-0 group-hover:opacity-100 transition-opacity">
                     {task.label}
                   </Badge> */}
-                </div>
-              ))}
+                  </div>
+                )
+              )}
             </div>
           </div>
         ))}
@@ -182,12 +197,12 @@ export default function MonthView({
          />
        )}
 
-       {/* Render the Task Detail Dialog */}
-      <TaskDetailDialog
-        task={selectedTask}
+       {/* Render the Event Detail Dialog */}
+      <EventDetailDialog
+        event={selectedEvent} // Pass selectedEvent
         isOpen={isDetailOpen}
         onClose={() => setIsDetailOpen(false)}
-        // No projectId prop needed here anymore
+        // Pass any other necessary props for the event dialog
       />
     </div>
   );
