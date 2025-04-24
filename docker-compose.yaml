@@ -52,6 +52,20 @@ services:
       - calendardb
       - rabbitmq
 
+  event-service:
+    build: ./event-service
+    ports:
+      - "8083:8083" # Expose event-service on port 8083
+    environment:
+      - EVENT_SERVICE_PORT=8083
+      # Construct DATABASE_URL from individual parts for pgxpool
+      - EVENT_DB_URL=postgres://eventuser:eventpassword@eventdb:5432/eventdb?sslmode=disable
+      - JWT_SECRET=N4fK9z$B&E)H@McQfTjWnZr4u7x!A%D* # MUST MATCH auth-service
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/ # For potential future events
+    depends_on:
+      - eventdb
+      - rabbitmq
+
   # frontend:
   #   build: ./frontend
   #   ports:
@@ -104,6 +118,17 @@ services:
     volumes:
       - calendardb_data:/var/lib/postgresql/data
 
+  eventdb: # Database for the event service
+    image: postgres:latest
+    environment:
+      POSTGRES_USER: eventuser
+      POSTGRES_DB: eventdb
+      POSTGRES_PASSWORD: eventpassword
+    ports:
+      - "5436:5432" # Map to host port 5436
+    volumes:
+      - eventdb_data:/var/lib/postgresql/data
+
   pgadmin:
     image: dpage/pgadmin4
     environment:
@@ -128,3 +153,4 @@ volumes:
   db_data:
   taskdb_data: # Volume for taskdb persistence
   calendardb_data: # Volume for calendardb persistence
+  eventdb_data: # Volume for eventdb persistence
