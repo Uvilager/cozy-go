@@ -22,6 +22,28 @@ export const authAxiosInstance = axios.create({
   },
 });
 
+// --- Calendar Service Axios Instance (Named Export) ---
+const CALENDAR_SERVICE_URL =
+  process.env.NEXT_PUBLIC_CALENDAR_SERVICE_URL || "http://localhost:8082";
+
+export const calendarAxiosInstance = axios.create({
+  baseURL: CALENDAR_SERVICE_URL,
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
+
+// --- Event Service Axios Instance (Named Export) ---
+const EVENT_SERVICE_URL =
+  process.env.NEXT_PUBLIC_EVENT_SERVICE_URL || "http://localhost:8083";
+
+export const eventAxiosInstance = axios.create({
+  baseURL: EVENT_SERVICE_URL,
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
+
 // --- Interceptors ---
 // Import js-cookie
 import Cookies from "js-cookie";
@@ -63,7 +85,54 @@ axiosInstance.interceptors.request.use(
     return Promise.reject(error);
   }
 );
-// Removed duplicated else block, return statement, and error handler
+
+// Request interceptor for the Calendar Service instance
+calendarAxiosInstance.interceptors.request.use(
+  (config) => {
+    if (typeof window !== "undefined") {
+      const token = Cookies.get("authToken");
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+        console.log("Calendar Service Interceptor (Client): Added auth token.");
+      } else {
+        console.log(
+          "Calendar Service Interceptor (Client): No auth token found."
+        );
+      }
+    } else {
+      console.log(
+        "Calendar Service Interceptor (Server): Skipping cookie check."
+      );
+    }
+    return config;
+  },
+  (error) => {
+    console.error("Calendar Service Interceptor Request Error:", error);
+    return Promise.reject(error);
+  }
+);
+
+// Request interceptor for the Event Service instance
+eventAxiosInstance.interceptors.request.use(
+  (config) => {
+    if (typeof window !== "undefined") {
+      const token = Cookies.get("authToken");
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+        console.log("Event Service Interceptor (Client): Added auth token.");
+      } else {
+        console.log("Event Service Interceptor (Client): No auth token found.");
+      }
+    } else {
+      console.log("Event Service Interceptor (Server): Skipping cookie check.");
+    }
+    return config;
+  },
+  (error) => {
+    console.error("Event Service Interceptor Request Error:", error);
+    return Promise.reject(error);
+  }
+);
 
 // Request interceptor for the Auth Service instance
 authAxiosInstance.interceptors.request.use(

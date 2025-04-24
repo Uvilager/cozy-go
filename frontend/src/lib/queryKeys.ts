@@ -24,6 +24,14 @@ export const queryKeys = {
   // Key for fetching the current authenticated user
   user: ["user"] as const,
 
+  // Key for fetching all calendars
+  calendars: ["calendars"] as const,
+
+  // Key for fetching events for a specific calendar.
+  // Handles undefined calendarId (maybe fetch all user events in future?)
+  events: (calendarId: number | undefined) =>
+    ["events", { calendarId }] as const,
+
   // Add other query keys as the application grows
 };
 
