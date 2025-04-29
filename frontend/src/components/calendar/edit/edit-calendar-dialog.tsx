@@ -2,22 +2,24 @@
 
 import * as React from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { EditProjectForm } from "./edit-project-form"; // Import the form
-import { Project } from "@/lib/api"; // Import Project type
+import { EditCalendarForm } from "./edit-calendar-form"; // Corrected relative import path
+import { Calendar } from "@/lib/api/calendars"; // Changed data type import
 
-interface EditProjectDialogProps {
-  project: Project | null; // Project to edit, or null if none
+// Renamed interface and props
+interface EditCalendarDialogProps {
+  calendar: Calendar | null; // Calendar to edit, or null if none
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void; // Optional callback after successful update
 }
 
-export function EditProjectDialog({
-  project,
+// Renamed component and props
+export function EditCalendarDialog({
+  calendar, // Changed prop name
   open,
   onOpenChange,
   onSuccess,
-}: EditProjectDialogProps) {
+}: EditCalendarDialogProps) {
   // Internal handlers to close dialog and call parent onSuccess
   const handleSuccess = () => {
     onOpenChange(false);
@@ -28,18 +30,19 @@ export function EditProjectDialog({
     onOpenChange(false);
   };
 
-  // Don't render anything if no project is selected or dialog is closed
+  // Don't render anything if no calendar is selected or dialog is closed
   // The Dialog component itself handles the 'open' prop for visibility
-  if (!project) {
+  if (!calendar) {
+    // Check calendar prop
     return null;
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
-        {/* Render the form inside the dialog content, passing the project */}
-        <EditProjectForm
-          project={project}
+        {/* Render the calendar form inside the dialog content, passing the calendar */}
+        <EditCalendarForm // Use EditCalendarForm
+          calendar={calendar} // Pass calendar prop
           onSuccess={handleSuccess}
           onCancel={handleCancel}
         />

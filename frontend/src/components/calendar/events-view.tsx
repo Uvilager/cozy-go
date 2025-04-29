@@ -1,7 +1,5 @@
 "use client";
 
-"use client";
-
 import React, { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCalendars } from "@/hooks/useCalendar"; // Corrected hook name: useCalendars

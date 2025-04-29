@@ -7,10 +7,9 @@ import {
 } from "@tanstack/react-query";
 // Task type might be needed if we handle data directly, but likely not with hooks/api layer
 // import { Task } from "@/components/tasks/data/schema";
-// import TaskTableClient from "@/components/tasks/task-table-client"; // Rendered by TasksView now
-// import { ProjectPicker } from "@/components/projects/project-picker"; // Rendered by TasksView now
-import TasksView from "@/components/tasks/tasks-view"; // Import the new client component wrapper
-import { getProjects, getTasksByProjectIds } from "@/lib/api"; // Import the new tasks function
+// Import the client component that will display calendars and events
+import EventsView from "@/components/calendar/events-view"; // Updated import to EventsView
+import { getCalendars, getEventsByCalendar } from "@/lib/api"; // Import calendar and event API functions
 import { queryKeys } from "@/lib/queryKeys"; // Import query keys
 import { cookies } from "next/headers"; // Import cookies function for Server Components
 
@@ -35,51 +34,50 @@ export default async function TasksPage({
     token ? "found" : "not found"
   );
 
-  // Prefetch projects first, passing the token
+  // Prefetch calendars first, passing the token
   try {
     await queryClient.prefetchQuery({
-      queryKey: queryKeys.projects,
-      queryFn: () => getProjects(token), // Pass token here
+      queryKey: queryKeys.calendars, // Use calendar query key
+      queryFn: () => getCalendars(token), // Use getCalendars API function
     });
   } catch (error) {
-    console.error("TasksPage: Failed to prefetch projects on server:", error);
+    console.error("TasksPage: Failed to prefetch calendars on server:", error);
     // Handle prefetch error if necessary (e.g., log)
   }
 
-  // We no longer get projects data here on the server.
-  // ProjectPicker client component will use the useProjects hook.
+  // We no longer get calendar data here on the server.
+  // The client component (e.g., CalendarPicker) will use the useCalendar hook.
 
-  // Determine the projectId to use based *only* on URL search params for server prefetch.
-  // The client-side ProjectPicker will handle defaulting if the param is missing/invalid.
-  const currentProjectIdParam = resolvedSearchParams.projectId as
+  // Determine the calendarId to use based *only* on URL search params for server prefetch.
+  // The client-side component will handle defaulting if the param is missing/invalid.
+  const currentCalendarIdParam = resolvedSearchParams.calendarId as  // Changed from projectId
     | string
     | undefined;
-  let projectIdToFetch: number | undefined;
+  let calendarIdToFetch: number | undefined;
 
   // Try to parse the ID from the URL param. No fallback logic here on the server.
-  if (currentProjectIdParam) {
-    const parsedId = parseInt(currentProjectIdParam, 10);
+  if (currentCalendarIdParam) {
+    const parsedId = parseInt(currentCalendarIdParam, 10);
     if (!isNaN(parsedId)) {
-      projectIdToFetch = parsedId;
-      // We don't validate against the actual project list here anymore,
-      // as we don't have it readily available without getQueryData.
-      // If the ID is invalid, the task prefetch might fail gracefully or fetch nothing.
+      calendarIdToFetch = parsedId;
+      // We don't validate against the actual calendar list here.
+      // If the ID is invalid, the event prefetch might fail gracefully or fetch nothing.
     }
   }
 
-  // Prefetch the task data only if a valid project ID is determined
-  if (projectIdToFetch !== undefined) {
+  // Prefetch the event data only if a valid calendar ID is determined
+  if (calendarIdToFetch !== undefined) {
     try {
-      // Prefetch using the new function and array key structure
+      // Prefetch using the new function and event query key structure
       await queryClient.prefetchQuery({
-        // Use the centralized query key, passing the ID in an array
-        queryKey: queryKeys.tasks([projectIdToFetch]),
-        // Use the new API function, passing the ID in an array and the token
-        queryFn: () => getTasksByProjectIds([projectIdToFetch], token),
+        // Use the centralized event query key, passing the ID
+        queryKey: queryKeys.events(calendarIdToFetch),
+        // Use the new API function, passing the ID and the token
+        queryFn: () => getEventsByCalendar(calendarIdToFetch, token),
       });
     } catch (error) {
       console.error(
-        `TasksPage: Failed to prefetch tasks for project ${projectIdToFetch} on server:`,
+        `TasksPage: Failed to prefetch events for calendar ${calendarIdToFetch} on server:`,
         error
       );
       // Handle prefetch error if necessary (e.g., log, but maybe don't block rendering)
@@ -92,9 +90,8 @@ export default async function TasksPage({
   return (
     // Pass the dehydrated state to the boundary
     <HydrationBoundary state={dehydratedState}>
-      {/* Adjusted padding and removed container for full width header possibility */}
-      {/* Render the TasksView client component, passing the initial ID */}
-      <TasksView initialProjectId={projectIdToFetch} />
+      {/* Render the client component, passing the initial calendar ID */}
+      <EventsView initialCalendarId={calendarIdToFetch} />
     </HydrationBoundary>
   );
 }

@@ -36,7 +36,8 @@ export function DeleteCalendarDialog({
   const handleDeleteConfirm = () => {
     if (!calendar || deleteCalendarMutation.isPending) return; // Check calendar
 
-    deleteCalendarMutation.mutate(calendar.id, { // Use calendar.id
+    deleteCalendarMutation.mutate(calendar.id, {
+      // Use calendar.id
       onSuccess: () => {
         // Updated toast message
         toast.success(`Calendar "${calendar.name}" and its events deleted.`);
@@ -54,7 +55,8 @@ export function DeleteCalendarDialog({
   };
 
   // Don't render anything if no calendar is selected
-  if (!calendar) { // Check calendar
+  if (!calendar) {
+    // Check calendar
     return null;
   }
 
@@ -71,17 +73,22 @@ export function DeleteCalendarDialog({
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={deleteCalendarMutation.isPending}> {/* Use calendar mutation state */}
+          <AlertDialogCancel disabled={deleteCalendarMutation.isPending}>
+            {" "}
+            {/* Use calendar mutation state */}
             Cancel
           </AlertDialogCancel>
           {/* Use Button component for styling consistency if needed, or default action */}
           <AlertDialogAction
             onClick={handleDeleteConfirm}
-            disabled={deleteCalendarMutation.isPending} {/* Use calendar mutation state */}
+            disabled={deleteCalendarMutation.isPending}
+            /* Use calendar mutation state */
             // Add visual indication of destructive action if desired
             // className="bg-red-600 hover:bg-red-700"
           >
-            {deleteCalendarMutation.isPending ? "Deleting..." : "Delete Calendar"}{" "}
+            {deleteCalendarMutation.isPending
+              ? "Deleting..."
+              : "Delete Calendar"}{" "}
             {/* Updated button text */}
           </AlertDialogAction>
         </AlertDialogFooter>
