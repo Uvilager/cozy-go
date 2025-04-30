@@ -38,14 +38,22 @@ export type UpdateEventPayload = Partial<
  * Fetches all events for a specific calendar from the API.
  * @param calendarId The ID of the calendar whose events are to be fetched.
  * @param token Optional auth token for server-side requests.
+ * @param startTime The start of the time range (ISO 8601 string).
+ * @param endTime The end of the time range (ISO 8601 string).
+ * @param token Optional auth token for server-side requests.
  * @returns A promise that resolves to an array of events.
  */
 export const getEventsByCalendar = async (
   calendarId: number,
+  startTime: string,
+  endTime: string,
   token?: string
 ): Promise<Event[]> => {
   if (!calendarId) {
     console.warn("API: Calendar ID is required to fetch events.");
+  }
+  if (!startTime || !endTime) {
+    console.warn("API: Start and end times are required to fetch events.");
     return []; // Or throw an error
   }
   try {
@@ -57,8 +65,15 @@ export const getEventsByCalendar = async (
 
     // Use eventAxiosInstance
     const response = await eventAxiosInstance.get<Event[]>(
-      `/calendars/${calendarId}/events`, // Correct endpoint
-      { headers }
+      `/events`, // Correct endpoint
+      {
+        params: {
+          calendar_ids: calendarId,
+          start: startTime, // Add start time param
+          end: endTime, // Add end time param
+        },
+        headers,
+      }
     );
 
     if (response.status !== 200) {
