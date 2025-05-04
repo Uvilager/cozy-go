@@ -21,22 +21,23 @@ services:
     depends_on:
       - rabbitmq
 
-  task-service:
-    build: ./task-service
-    ports:
-      - "8081:8081" # Expose task-service on port 8081
-    environment:
-      - TASK_SERVICE_PORT=8081
-      - TASK_DB_HOST=taskdb # Service name of the task database
-      - TASK_DB_PORT=5432 # Internal port for postgres
-      - TASK_DB_USER=taskuser
-      - TASK_DB_PASSWORD=taskpassword
-      - TASK_DB_NAME=taskdb
-      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/ # For later event publishing
-      - JWT_SECRET=N4fK9z$B&E)H@McQfTjWnZr4u7x!A%D* # Added JWT Secret (MUST MATCH auth-service)
-    depends_on:
-      - taskdb
-      - rabbitmq
+  # DEPRECEATED: Uncomment if you want to use the task service
+  # task-service:
+  #   build: ./task-service
+  #   ports:
+  #     - "8081:8081" # Expose task-service on port 8081
+  #   environment:
+  #     - TASK_SERVICE_PORT=8081
+  #     - TASK_DB_HOST=taskdb # Service name of the task database
+  #     - TASK_DB_PORT=5432 # Internal port for postgres
+  #     - TASK_DB_USER=taskuser
+  #     - TASK_DB_PASSWORD=taskpassword
+  #     - TASK_DB_NAME=taskdb
+  #     - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/ # For later event publishing
+  #     - JWT_SECRET=N4fK9z$B&E)H@McQfTjWnZr4u7x!A%D* # Added JWT Secret (MUST MATCH auth-service)
+  #   depends_on:
+  #     - taskdb
+  #     - rabbitmq
 
   calendar-service:
     build: ./calendar-service
@@ -87,25 +88,27 @@ services:
     volumes:
       - db_data:/var/lib/postgresql/data
 
-  test-db:
-    image: postgres:latest
-    environment:
-      POSTGRES_USER: username
-      POSTGRES_DB: testdb
-      POSTGRES_PASSWORD: password
-    ports:
-      - "5433:5432"
+  # DEPRECEATED: Uncomment if you want to use the test database
+  # test-db:
+  #   image: postgres:latest
+  #   environment:
+  #     POSTGRES_USER: username
+  #     POSTGRES_DB: testdb
+  #     POSTGRES_PASSWORD: password
+  #   ports:
+  #     - "5433:5432"
 
-  taskdb: # Database for the task service
-    image: postgres:latest
-    environment:
-      POSTGRES_USER: taskuser
-      POSTGRES_DB: taskdb
-      POSTGRES_PASSWORD: taskpassword
-    ports:
-      - "5434:5432" # Map to host port 5434 to avoid conflicts
-    volumes:
-      - taskdb_data:/var/lib/postgresql/data
+  # DEPRECEATED: Uncomment if you want to use the test database
+  # taskdb: # Database for the task service
+  #   image: postgres:latest
+  #   environment:
+  #     POSTGRES_USER: taskuser
+  #     POSTGRES_DB: taskdb
+  #     POSTGRES_PASSWORD: taskpassword
+  #   ports:
+  #     - "5434:5432" # Map to host port 5434 to avoid conflicts
+  #   volumes:
+  #     - taskdb_data:/var/lib/postgresql/data
 
   calendardb: # Database for the calendar service
     image: postgres:latest
