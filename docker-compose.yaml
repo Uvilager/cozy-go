@@ -67,6 +67,20 @@ services:
       - eventdb
       - rabbitmq
 
+  task-service:
+    build: ./task-service
+    ports:
+      - "8084:8083" # Expose task-service on host port 8084, container port 8083
+    environment:
+      - TASK_SERVICE_PORT=8083
+      # Construct DATABASE_URL for pgxpool
+      - DATABASE_URL=postgres://taskuser:taskpassword@taskdb:5432/taskdb?sslmode=disable
+      - JWT_SECRET=N4fK9z$B&E)H@McQfTjWnZr4u7x!A%D* # MUST MATCH auth-service
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/ # For potential future events
+    depends_on:
+      - taskdb
+      - rabbitmq
+
   # frontend:
   #   build: ./frontend
   #   ports:
@@ -131,6 +145,17 @@ services:
       - "5436:5432" # Map to host port 5436
     volumes:
       - eventdb_data:/var/lib/postgresql/data
+
+  taskdb: # Database for the task service
+    image: postgres:latest
+    environment:
+      POSTGRES_USER: taskuser
+      POSTGRES_DB: taskdb
+      POSTGRES_PASSWORD: taskpassword
+    ports:
+      - "5434:5432" # Map to host port 5434
+    volumes:
+      - taskdb_data:/var/lib/postgresql/data
 
   pgadmin:
     image: dpage/pgadmin4
