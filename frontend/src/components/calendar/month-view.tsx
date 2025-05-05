@@ -124,6 +124,7 @@ export default function MonthView({
       </div>
 
       {/* Calendar Grid */}
+      {/* Remove grid-rows-6 if you want to maximize space */}
       <div className="grid grid-cols-7 grid-rows-6 gap-1 flex-1">
         {daysInGrid.map((day) => (
           <div
