@@ -20,7 +20,7 @@ const stringifyCalendarIds = (ids: number[]): string => {
   return ids.join(",");
 };
 
-export function MultiProjectSelector() {
+export function MultiCalendarSelector() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -30,11 +30,42 @@ export function MultiProjectSelector() {
   const [selectedIds, setSelectedIds] = useState<number[]>(
     () => parseCalendarIds(searchParams.get("calendars")) // Use new function and param name
   );
+  const [defaultApplied, setDefaultApplied] = useState(false); // Track if default has been applied
 
   // Update local state if URL changes externally
   useEffect(() => {
     setSelectedIds(parseCalendarIds(searchParams.get("calendars"))); // Use new function and param name
   }, [searchParams]);
+
+  // Effect to set default selection if URL param is missing and calendars are loaded
+  useEffect(() => {
+    const currentParam = searchParams.get("calendars");
+    // Only proceed if the param is missing, default hasn't been applied,
+    // calendars are loaded, and there's at least one calendar
+    if (
+      !currentParam &&
+      !defaultApplied &&
+      !isLoading &&
+      calendars &&
+      calendars.length > 0
+    ) {
+      const defaultCalendarId = calendars[0].id;
+      const defaultIds = [defaultCalendarId];
+
+      // Update local state
+      setSelectedIds(defaultIds);
+      // Mark default as applied
+      setDefaultApplied(true);
+
+      // Update URL without adding to history
+      const newSearchParams = new URLSearchParams(searchParams.toString());
+      newSearchParams.set("calendars", stringifyCalendarIds(defaultIds));
+      router.replace(`${pathname}?${newSearchParams.toString()}`);
+    }
+    // Run this effect when loading state changes, calendars data changes,
+    // the URL param changes, or the defaultApplied flag changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, calendars, searchParams.get("calendars"), defaultApplied]);
 
   // Function to update URL when checkbox changes
   const handleCheckboxChange = useCallback(

@@ -1,7 +1,7 @@
 "use client"; // Make this a client component
 
 import * as React from "react";
-import { usePathname } from "next/navigation"; // Import usePathname
+import { usePathname, useSearchParams } from "next/navigation"; // Import useSearchParams
 import {
   BookOpen,
   Bot,
@@ -25,8 +25,8 @@ import { ModeToggle } from "@/components/navbar/mode-toggle";
 // Remove Calendar imports, they are now in CalendarNav
 // import { Calendar } from "@/components/ui/calendar";
 // import { useCalendarStore } from "@/store/calendarStore";
-import { CalendarNav } from "./calendar-nav";
-import { MultiProjectSelector } from "@/components/projects/multi-project-selector"; // Import MultiProjectSelector
+import { CalendarNav } from "./calendar/calendar-nav"; // Adjusted path
+import { MultiCalendarSelector } from "@/components/sidebar/calendar/multi-calendar-selector"; // Import MultiCalendarSelector with new name/path
 
 import { NavMain } from "@/components/sidebar/nav-main";
 import { NavProjects } from "@/components/sidebar/nav-projects";
@@ -47,108 +47,7 @@ import {
 // Remove hardcoded data object
 // const data = { ... };
 
-// Define nav data directly or fetch it if needed
-const navMainData = [
-  // Add Tasks and Calendar links
-  {
-    title: "Tasks",
-    url: "/tasks", // Link to tasks page
-    icon: CheckSquare, // Use CheckSquare icon
-  },
-  {
-    title: "Calendar",
-    url: "/calendar", // Link to calendar page
-    icon: CalendarIcon, // Use renamed Calendar icon
-  },
-  // Keep existing playground/models etc. or remove if not needed
-  // {
-  //   title: "Playground",
-  //   url: "#",
-  //   icon: SquareTerminal,
-  //   // isActive: true, // Remove isActive or manage dynamically
-  //   items: [
-  //     {
-  //       title: "History",
-  //       url: "#",
-  //     },
-  //     {
-  //       title: "Starred",
-  //       url: "#",
-  //     },
-  //     {
-  //       title: "Settings",
-  //       url: "#",
-  //     },
-  //   ],
-  // },
-  // {
-  //   title: "Models",
-  //   url: "#",
-  //   icon: Bot,
-  //   items: [
-  //     {
-  //       title: "Genesis",
-  //       url: "#",
-  //     },
-  //     {
-  //       title: "Explorer",
-  //       url: "#",
-  //     },
-  //     {
-  //       title: "Quantum",
-  //       url: "#",
-  //     },
-  //   ],
-  // },
-  // {
-  //   title: "Documentation",
-  //   url: "#",
-  //   icon: BookOpen,
-  //   items: [
-  //     {
-  //       title: "Introduction",
-  //       url: "#",
-  //     },
-  //     {
-  //       title: "Get Started",
-  //       url: "#",
-  //     },
-  //     {
-  //       title: "Tutorials",
-  //       url: "#",
-  //     },
-  //     {
-  //       title: "Changelog",
-  //       url: "#",
-  //     },
-  //   ],
-  // },
-  {
-    title: "Settings",
-    url: "#",
-    icon: Settings2,
-    items: [
-      {
-        title: "General",
-        url: "#",
-      },
-      {
-        title: "Team",
-        url: "#",
-      },
-      {
-        title: "Billing",
-        url: "#",
-      },
-      {
-        title: "Limits",
-        url: "#",
-      },
-    ],
-  },
-]; // Correctly close the navMainData array
-
-// Keep the separate definitions below
+// Keep the separate definitions below for secondary nav and projects
 const navSecondaryData = [
   {
     title: "Support",
@@ -182,9 +81,116 @@ const projectsData = [
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname(); // Get current path
+  const searchParams = useSearchParams(); // Get search params
   const isCalendarPage = pathname.startsWith("/calendar"); // Check if it's the calendar page
 
+  // Calculate dynamic calendar href
+  const calendarHref = isCalendarPage
+    ? `${pathname}?${searchParams.toString()}` // Preserve params if on calendar page
+    : "/calendar"; // Base path otherwise
+
   const { data: user, isLoading, isError, error } = useUser(); // Fetch user data
+
+  // Define main nav data inside the component to use dynamic href
+  const navMainData = [
+    // Add Tasks and Calendar links
+    {
+      title: "Tasks",
+      url: "/tasks", // Link to tasks page
+      icon: CheckSquare, // Use CheckSquare icon
+    },
+    {
+      title: "Calendar",
+      url: calendarHref, // Use dynamic href
+      icon: CalendarIcon, // Use renamed Calendar icon
+    },
+    // Keep existing playground/models etc. or remove if not needed
+    // {
+    //   title: "Playground",
+    //   url: "#",
+    //   icon: SquareTerminal,
+    //   // isActive: true, // Remove isActive or manage dynamically
+    //   items: [
+    //     {
+    //       title: "History",
+    //       url: "#",
+    //     },
+    //     {
+    //       title: "Starred",
+    //       url: "#",
+    //     },
+    //     {
+    //       title: "Settings",
+    //       url: "#",
+    //     },
+    //   ],
+    // },
+    // {
+    //   title: "Models",
+    //   url: "#",
+    //   icon: Bot,
+    //   items: [
+    //     {
+    //       title: "Genesis",
+    //       url: "#",
+    //     },
+    //     {
+    //       title: "Explorer",
+    //       url: "#",
+    //     },
+    //     {
+    //       title: "Quantum",
+    //       url: "#",
+    //     },
+    //   ],
+    // },
+    // {
+    //   title: "Documentation",
+    //   url: "#",
+    //   icon: BookOpen,
+    //   items: [
+    //     {
+    //       title: "Introduction",
+    //       url: "#",
+    //     },
+    //     {
+    //       title: "Get Started",
+    //       url: "#",
+    //     },
+    //     {
+    //       title: "Tutorials",
+    //       url: "#",
+    //     },
+    //     {
+    //       title: "Changelog",
+    //       url: "#",
+    //     },
+    //   ],
+    // },
+    {
+      title: "Settings",
+      url: "#",
+      icon: Settings2,
+      items: [
+        {
+          title: "General",
+          url: "#",
+        },
+        {
+          title: "Team",
+          url: "#",
+        },
+        {
+          title: "Billing",
+          url: "#",
+        },
+        {
+          title: "Limits",
+          url: "#",
+        },
+      ],
+    },
+  ]; // Correctly close the navMainData array
 
   // Remove calendar-specific state and handlers
   // const { currentDate, setCurrentDate } = useCalendarStore();
@@ -225,11 +231,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         {/* Use defined data variables */}
         <NavMain items={navMainData} />
 
-        {/* Conditionally Render CalendarNav and MultiProjectSelector */}
+        {/* Conditionally Render CalendarNav and MultiCalendarSelector */}
         {isCalendarPage && (
           <>
             <CalendarNav />
-            <MultiProjectSelector />
+            <MultiCalendarSelector />
           </>
         )}
 

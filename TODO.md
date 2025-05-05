@@ -53,7 +53,7 @@
 - [ reform ]
 - [ sidebar calendar pciker defaults to first one ]
 - [ main/favourite calendars]
-- [ ]
+- [ implement new task-service into frontend.]
 - [ ]
 - [ ]
 - [ ]
